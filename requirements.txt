@@ -1,2 +1,6 @@
 streamlit
 sentence-transformers
+policyengine-uk
+policyengine-us
+tqdm
+openai
