@@ -397,7 +397,7 @@ def give_complete_answer(steps: dict) -> str:
     
     IMPORTANT: respond first with the shortest sentence that answers their question only in a single concise sentence.
     
-    You can give a few more details afterwards if they're relevant for understanding the answer. Use Markdown formatting to embolden and make it look nice, and e.g. shorten large numbers to e.g. bn. At the end, give a disclaimer that the results were computed with PolicyEngine, a simulation tool and that the users should check with tax or benefit advisors before making financial decisions based on them.
+    You can give a few more details afterwards if they're relevant for understanding the answer, like a table showing the workings-out. Use Markdown formatting to embolden and make it look nice, and e.g. shorten large numbers to e.g. bn. At the end, give a disclaimer that the results were computed with PolicyEngine, a simulation tool and that the users should check with tax or benefit advisors before making financial decisions based on them.
     
     Steps: {steps}
     """
