@@ -443,6 +443,7 @@ def ask_policyengine(prompt: str) -> Tuple[str, dict]:
                 "target_variable": target_variable,
                 "simulation_result": simulation_result,
                 "reform": reform,
+                "user_question": prompt,
             }
         )
         return complete_answer, {
@@ -451,6 +452,7 @@ def ask_policyengine(prompt: str) -> Tuple[str, dict]:
             "target_variable": target_variable,
             "simulation_result": simulation_result,
             "reform": reform,
+            "user_question": prompt,
         }
     elif output_category == "C":
         reform = build_reform(prompt)
@@ -460,12 +462,14 @@ def ask_policyengine(prompt: str) -> Tuple[str, dict]:
                 "output_category": output_category_step,
                 "reform": reform,
                 "model_economic_impacts": economic_impacts,
+                "user_question": prompt,
             }
         )
         return complete_answer, {
             "output_category": output_category_step,
             "reform": reform,
             "model_economic_impacts": economic_impacts,
+            "user_question": prompt,
         }
 
 
