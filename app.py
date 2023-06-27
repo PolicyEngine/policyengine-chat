@@ -321,11 +321,13 @@ def build_household(prompt: str) -> dict:
         indent=4
     )}
 
-    In addition, for US instances please specify the US state for this household if the user provides it. The state should be added to the 'households' section of the JSON under 'state_name' as a two-letter code. If doing so, please also add a `members` attribute to the household, as a list of the person names.
+    Please also add parent entities that each include a `members` attribute as a list of person keys. In the US, these are `households`, `tax_units`, and `spm_units`. In the UK, they are `households` and `benunits`.
+    
+    In addition, for US instances please specify the US state for this household if the user provides it. The state should be added to the 'households' section of the JSON under 'state_name' as a two-letter code.
 
-    If the user doesn't provide ages, enter 40 for adults and 10 for children.
+    In the US and UK, if the user doesn't provide ages, enter 40 for adults and 10 for children.
 
-    Assume for the above example that age and employment income was provided, and do not add any assumed variables unless they've been explicitly provided. I will give you the metadata of any relevant variables for the household. Add variables to the appropriate entity according to the 'entity' key in their metadata.
+    Assume for the above example that age and employment income was provided, and do not add any assumed variables unless they've been explicitly provided or defaults as above. I will give you the metadata of any relevant variables for the household. Add variables to the appropriate entity according to the 'entity' key in their metadata.
     Respond only with the JSON description of the household. 
     
     If you are unsure, respond with an empty JSON object.
