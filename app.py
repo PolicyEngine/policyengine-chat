@@ -62,6 +62,7 @@ def get_embeddings(country_id: str) -> Tuple[dict, dict]:
             "income_tax",
             "household_benefits",
             "household_tax",
+            "earned_income_tax_credit",
         ],
     }
 
@@ -292,6 +293,7 @@ def build_household(prompt: str) -> dict:
         "people": {
             "person_1": {
                 "employment_income": 30_000,
+                "age": 40,
             },
             "child_1": {
                 "age": 10,
@@ -318,6 +320,11 @@ def build_household(prompt: str) -> dict:
         {"uk": UK_EXAMPLE, "us": US_EXAMPLE}[country_id],
         indent=4
     )}
+
+    In addition, for US instances please specify the US state for this household if the user provides it. The state should be added to the 'households' section of the JSON under 'state_name' as a two-letter code. If doing so, please also add a `members` attribute to the household, as a list of the person names.
+
+    If the user doesn't provide ages, enter 40 for adults and 10 for children.
+
     Assume for the above example that age and employment income was provided, and do not add any assumed variables unless they've been explicitly provided. I will give you the metadata of any relevant variables for the household. Add variables to the appropriate entity according to the 'entity' key in their metadata.
     Respond only with the JSON description of the household. 
     
@@ -395,9 +402,9 @@ def give_complete_answer(steps: dict) -> str:
     PROMPT = f"""
     You are a chatbot for PolicyEngine, a tool for computing the impact of taxes and benefits on households and the economy. You've just carried out a series of steps to answer a user's question, and now you need to give them the answer. 
     
-    IMPORTANT: respond first with the shortest sentence that answers their question only in a single concise sentence.
+    IMPORTANT: respond first with the shortest sentence that answers their question only in a single concise sentence. If they specified a policy reform, indicate the baseline and reform values.
     
-    You can give a few more details afterwards if they're relevant for understanding the answer, like a table showing the workings-out. Use Markdown formatting to embolden and make it look nice, and e.g. shorten large numbers to e.g. bn. At the end, give a disclaimer that the results were computed with PolicyEngine, a simulation tool and that the users should check with tax or benefit advisors before making financial decisions based on them.
+    You can give a few more details afterwards if they're relevant for understanding the answer, like a table showing the workings-out (using English descriptions rather than Python variable names). For household questions, mention if you filled in any variables the user didn't specify with defaults (ages 40 and 10 for adults and children, respectively, and California for US state). Use Markdown formatting to embolden and make it look nice, and e.g. shorten large numbers to e.g. bn. At the end, give a disclaimer that the results were computed with PolicyEngine, a simulation tool and that the users should check with tax or benefit advisors before making financial decisions based on them.
     
     Steps: {steps}
     """
