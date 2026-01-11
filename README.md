@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PolicyEngine Chat
 
-## Getting Started
+A chat interface for the PolicyEngine agent. Ask questions about UK or US tax and benefit policy, calculate household impacts, and analyse economy-wide reforms.
 
-First, run the development server:
+## Setup
 
+### Prerequisites
+
+- [Bun](https://bun.sh) runtime
+- [Modal](https://modal.com) account (for the agent)
+- Supabase project (already deployed at `xieouadfboiipmwqrhyg`)
+
+### Local development
+
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+bun install
+```
+
+2. Create `.env.local` (or use the existing one):
+```bash
+cp .env.local.example .env.local
+```
+
+3. Start the dev server:
+```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to use the chat.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Deploying the Modal agent
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The agent runs on Modal and stores logs in Supabase. To redeploy:
 
-## Learn More
+```bash
+cd modal_agent
+modal deploy agent.py
+```
 
-To learn more about Next.js, take a look at the following resources:
+The Modal function needs two secrets:
+- `anthropic-api-key` - your Anthropic API key
+- `policyengine-chat-supabase` - Supabase URL and service key
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase API URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `SUPABASE_SERVICE_KEY` | Supabase service role key (server-side only) |
+| `NEXT_PUBLIC_API_BASE_URL` | PolicyEngine API URL (default: https://v2.api.policyengine.org) |
 
-## Deploy on Vercel
+## Database schema
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Three tables:
+- **threads**: Chat sessions with title and timestamps
+- **messages**: User and assistant messages
+- **agent_logs**: Streaming logs during agent execution
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See `supabase/migrations/001_initial.sql` for the full schema.
+
+## Architecture
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   Next.js   │────▶│    Modal     │────▶│  Supabase   │
+│   Frontend  │     │    Agent     │     │   Database  │
+└─────────────┘     └──────────────┘     └─────────────┘
+       │                   │                    │
+       │                   ▼                    │
+       │           ┌──────────────┐             │
+       │           │ PolicyEngine │             │
+       │           │    API v2    │             │
+       │           └──────────────┘             │
+       │                                        │
+       └────────────────────────────────────────┘
+                    (realtime updates)
+```
+
+1. User sends message → saved to Supabase
+2. Next.js API spawns Modal agent
+3. Agent calls PolicyEngine API, streams logs to Supabase
+4. Agent saves final response to Supabase
+5. Frontend receives updates via Supabase realtime
