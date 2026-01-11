@@ -11,7 +11,7 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const supabase = createClient();
 
   const currentThreadId = pathname?.startsWith("/chat/")
@@ -114,14 +114,24 @@ export function Sidebar() {
 
             <button
               onClick={createThread}
+              disabled={isLoading || !user}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5
                 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-lg
-                transition-colors font-medium text-sm shadow-sm"
+                transition-colors font-medium text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New conversation
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  New conversation
+                </>
+              )}
             </button>
           </div>
 
