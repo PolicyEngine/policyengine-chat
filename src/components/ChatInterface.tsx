@@ -474,9 +474,9 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                     <span className="text-sm font-medium text-[var(--color-text-primary)]">Public link</span>
                     <button
                       onClick={togglePublic}
-                      className={`relative w-10 h-5 rounded-full transition-colors ${isPublic ? "bg-[var(--color-pe-green)]" : "bg-gray-300"}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isPublic ? "bg-[var(--color-pe-green)]" : "bg-gray-200"}`}
                     >
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${isPublic ? "translate-x-5" : "translate-x-0.5"}`} />
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
                     </button>
                   </div>
                   {isPublic && (
