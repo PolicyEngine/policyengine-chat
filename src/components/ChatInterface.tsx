@@ -208,6 +208,46 @@ function ToolCard({ step }: { step: ParsedStep }) {
   return null;
 }
 
+function CollapsedLogs({ logs }: { logs: AgentLog[] }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const parsedSteps = useMemo(() => {
+    return logs
+      .map(log => parseLogEntry(log.message))
+      .filter(step => step.type !== "unknown" && step.type !== "agent");
+  }, [logs]);
+
+  if (parsedSteps.length === 0) return null;
+
+  const toolCount = parsedSteps.filter(s => s.type === "tool_use").length;
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] font-mono"
+      >
+        <svg
+          className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <span>{toolCount} tool call{toolCount !== 1 ? "s" : ""}</span>
+      </button>
+      {isExpanded && (
+        <div className="mt-2 p-3 bg-[var(--color-surface-sunken)] rounded-xl border border-[var(--color-border)]">
+          {parsedSteps.map((step, i) => (
+            <ToolCard key={i} step={step} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProgressIndicator({ logs }: { logs: AgentLog[] }) {
   const stage = useMemo(() => {
     const messages = logs.map(l => l.message.toLowerCase());
@@ -238,6 +278,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<AgentLog[]>([]);
+  const [messageLogs, setMessageLogs] = useState<Record<string, AgentLog[]>>({});
   const [isPublic, setIsPublic] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -266,6 +307,11 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
             return [...prev, newMessage];
           });
           if (newMessage.role === "assistant") {
+            // Save logs for this message before clearing
+            setMessageLogs((prev) => ({
+              ...prev,
+              [newMessage.id]: logs,
+            }));
             setLogs([]);
             setIsLoading(false);
           }
@@ -515,11 +561,17 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                   <div className="w-8 h-8 rounded-lg bg-[var(--color-pe-green)] flex items-center justify-center flex-shrink-0 shadow-sm">
                     <span className="text-white text-xs font-bold">PE</span>
                   </div>
-                  <div className="flex-1 bg-white border border-[var(--color-border)] rounded-2xl rounded-tl-md px-5 py-4 shadow-sm">
-                    <div className="response-content">
-                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                        {message.content}
-                      </ReactMarkdown>
+                  <div className="flex-1">
+                    {/* Collapsed logs for this message */}
+                    {messageLogs[message.id] && messageLogs[message.id].length > 0 && (
+                      <CollapsedLogs logs={messageLogs[message.id]} />
+                    )}
+                    <div className="bg-white border border-[var(--color-border)] rounded-2xl rounded-tl-md px-5 py-4 shadow-sm">
+                      <div className="response-content">
+                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 </div>

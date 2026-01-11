@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,17 +10,18 @@ interface PageProps {
 
 export default async function SharedChatPage({ params }: PageProps) {
   const { threadId } = await params;
-  const supabase = await createClient();
+  // Use service client to bypass RLS for public thread access
+  const supabase = createServiceClient();
 
   // Fetch thread (only if public)
-  const { data: thread } = await supabase
+  const { data: thread, error } = await supabase
     .from("threads")
     .select("*")
     .eq("id", threadId)
     .eq("is_public", true)
     .single();
 
-  if (!thread) {
+  if (!thread || error) {
     notFound();
   }
 
