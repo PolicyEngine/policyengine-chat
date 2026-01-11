@@ -323,6 +323,10 @@ def execute_api_tool(
         if key not in param_names:
             body_data[key] = value
 
+    # If body_data only has a "body" key with a list, send just the list
+    if list(body_data.keys()) == ["body"] and isinstance(body_data["body"], list):
+        body_data = body_data["body"]
+
     try:
         log_fn(f"[API] {method.upper()} {url}")
         if query_params:
