@@ -488,6 +488,23 @@ def run_agent(
         except Exception as e:
             print(f"Failed to save message: {e}")
 
+        # Generate a title for the thread
+        try:
+            title_response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=50,
+                messages=[
+                    {"role": "user", "content": question},
+                    {"role": "assistant", "content": final_response},
+                    {"role": "user", "content": "Generate a short title (max 6 words) for this conversation. Reply with just the title, no quotes or punctuation."},
+                ],
+            )
+            title = title_response.content[0].text.strip()[:60]
+            supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
+            log(f"[AGENT] Set title: {title}")
+        except Exception as e:
+            print(f"Failed to set title: {e}")
+
     return {
         "status": "completed",
         "answer": final_response,

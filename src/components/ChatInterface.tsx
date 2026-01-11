@@ -347,6 +347,42 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
     };
   }, [threadId]);
 
+  // Poll for new messages as fallback when loading
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const pollInterval = setInterval(async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("thread_id", threadId)
+        .order("created_at", { ascending: true });
+
+      if (data && data.length > messages.length) {
+        const newMessages = data.filter(
+          (m) => !messages.some((existing) => existing.id === m.id)
+        );
+        if (newMessages.some((m) => m.role === "assistant")) {
+          setMessages(data);
+          // Save current logs before clearing
+          const assistantMsg = newMessages.find((m) => m.role === "assistant");
+          if (assistantMsg) {
+            setLogs((currentLogs) => {
+              setMessageLogs((prev) => ({
+                ...prev,
+                [assistantMsg.id]: currentLogs,
+              }));
+              return [];
+            });
+          }
+          setIsLoading(false);
+        }
+      }
+    }, 2000);
+
+    return () => clearInterval(pollInterval);
+  }, [isLoading, threadId, messages.length]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
