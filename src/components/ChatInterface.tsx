@@ -307,12 +307,14 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
             return [...prev, newMessage];
           });
           if (newMessage.role === "assistant") {
-            // Save logs for this message before clearing
-            setMessageLogs((prev) => ({
-              ...prev,
-              [newMessage.id]: logs,
-            }));
-            setLogs([]);
+            // Save logs for this message before clearing (use callback to get current logs)
+            setLogs((currentLogs) => {
+              setMessageLogs((prev) => ({
+                ...prev,
+                [newMessage.id]: currentLogs,
+              }));
+              return [];
+            });
             setIsLoading(false);
           }
         }
