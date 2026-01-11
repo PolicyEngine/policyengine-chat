@@ -177,6 +177,24 @@ function ToolCard({ step }: { step: ParsedStep }) {
   }
 
   if (step.type === "tool_result") {
+    // Try to parse and format as JSON
+    let formattedContent = step.content;
+    let isTruncated = false;
+    try {
+      const parsed = JSON.parse(step.content);
+      formattedContent = JSON.stringify(parsed, null, 2);
+    } catch {
+      // Check if it looks truncated (ends abruptly)
+      if (step.content.endsWith("...") || (step.content.length > 200 && !step.content.endsWith("}") && !step.content.endsWith("]"))) {
+        isTruncated = true;
+      }
+    }
+
+    // Limit display size
+    const MAX_SIZE = 10000;
+    const isLarge = formattedContent.length > MAX_SIZE;
+    const displayContent = isLarge ? formattedContent.slice(0, MAX_SIZE) + "\n\n... (truncated)" : formattedContent;
+
     return (
       <div className="py-1 ml-3.5 animate-fadeIn">
         <button
@@ -186,11 +204,11 @@ function ToolCard({ step }: { step: ParsedStep }) {
           <svg className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span>result</span>
+          <span>result {isTruncated && "(truncated in logs)"}</span>
         </button>
         {isExpanded && (
-          <div className="mt-1.5 text-[11px] bg-[var(--color-code-bg)] text-[var(--color-code-text)] rounded-lg p-3 overflow-x-auto max-h-48 overflow-y-auto animate-slideDown font-mono">
-            <pre className="whitespace-pre-wrap leading-relaxed">{step.content}</pre>
+          <div className="mt-1.5 text-[11px] bg-[var(--color-code-bg)] text-[var(--color-code-text)] rounded-lg p-3 overflow-x-auto max-h-96 overflow-y-auto animate-slideDown font-mono">
+            <pre className="whitespace-pre-wrap leading-relaxed">{displayContent}</pre>
           </div>
         )}
       </div>
@@ -626,7 +644,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
               <div className="flex-1 bg-[var(--color-surface-sunken)] rounded-2xl rounded-tl-md p-4 max-h-[500px] overflow-y-auto border border-[var(--color-border)]">
                 <ProgressIndicator logs={logs} />
                 <div className="space-y-0">
-                  {parsedSteps.slice(-15).map((step, j) => (
+                  {parsedSteps.map((step, j) => (
                     <ToolCard key={j} step={step} />
                   ))}
                   <div ref={logsEndRef} />

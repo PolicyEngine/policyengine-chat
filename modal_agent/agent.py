@@ -464,7 +464,7 @@ def run_agent(
                     else:
                         result = f"Unknown tool: {block.name}"
 
-                log(f"[TOOL_RESULT] {result[:300]}")
+                log(f"[TOOL_RESULT] {result[:5000]}")
 
                 tool_results.append({
                     "type": "tool_result",
