@@ -15,12 +15,13 @@ import requests
 from supabase import create_client
 
 image = modal.Image.debian_slim(python_version="3.12").pip_install(
-    "anthropic", "requests", "supabase", "fastapi"
+    "anthropic", "requests", "supabase", "fastapi", "logfire"
 )
 
 app = modal.App("policyengine-chat-agent")
 anthropic_secret = modal.Secret.from_name("anthropic-api-key")
 supabase_secret = modal.Secret.from_name("policyengine-chat-supabase")
+logfire_secret = modal.Secret.from_name("logfire")
 
 
 SYSTEM_PROMPT = """You are a PolicyEngine assistant that helps users understand tax and benefit policies.
@@ -373,18 +374,24 @@ def execute_api_tool(
         return f"Request error: {str(e)}"
 
 
-@app.function(image=image, secrets=[anthropic_secret, supabase_secret], timeout=600)
+@app.function(image=image, secrets=[anthropic_secret, supabase_secret, logfire_secret], timeout=600)
 def run_agent(
     question: str,
     thread_id: str,
     api_base_url: str = "https://v2.api.policyengine.org",
     history: list[dict] | None = None,
     max_turns: int = 30,
+    user_id: str | None = None,
 ) -> dict:
     """Run agentic loop to answer a policy question.
 
     Stores logs in Supabase agent_logs table and final result as a message.
     """
+    import logfire
+
+    # Configure logfire for token tracking
+    logfire.configure()
+
     # Connect to Supabase
     supabase_url = os.environ["SUPABASE_URL"]
     supabase_key = os.environ["SUPABASE_SERVICE_KEY"]
@@ -416,6 +423,7 @@ def run_agent(
     claude_tools.append(SLEEP_TOOL)
 
     client = anthropic.Anthropic()
+    logfire.instrument_anthropic(client)
 
     messages = []
     if history:
@@ -426,58 +434,59 @@ def run_agent(
     final_response = None
     turns = 0
 
-    while turns < max_turns:
-        turns += 1
-        log(f"[AGENT] Turn {turns}")
+    with logfire.span("agent_conversation", thread_id=thread_id, user_id=user_id or "anonymous"):
+        while turns < max_turns:
+            turns += 1
+            log(f"[AGENT] Turn {turns}")
 
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            tools=claude_tools,
-            messages=messages,
-        )
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4096,
+                system=SYSTEM_PROMPT,
+                tools=claude_tools,
+                messages=messages,
+            )
 
-        log(f"[AGENT] Stop reason: {response.stop_reason}")
+            log(f"[AGENT] Stop reason: {response.stop_reason}")
 
-        assistant_content = []
-        tool_results = []
+            assistant_content = []
+            tool_results = []
 
-        for block in response.content:
-            if block.type == "text":
-                log(f"[ASSISTANT] {block.text[:500]}")
-                assistant_content.append(block)
-                final_response = block.text
-            elif block.type == "tool_use":
-                log(f"[TOOL_USE] {block.name}: {json.dumps(block.input)[:200]}")
-                assistant_content.append(block)
+            for block in response.content:
+                if block.type == "text":
+                    log(f"[ASSISTANT] {block.text[:500]}")
+                    assistant_content.append(block)
+                    final_response = block.text
+                elif block.type == "tool_use":
+                    log(f"[TOOL_USE] {block.name}: {json.dumps(block.input)[:200]}")
+                    assistant_content.append(block)
 
-                if block.name == "sleep":
-                    seconds = min(max(block.input.get("seconds", 5), 1), 60)
-                    log(f"[SLEEP] Waiting {seconds} seconds...")
-                    time.sleep(seconds)
-                    result = f"Slept for {seconds} seconds"
-                else:
-                    tool = tool_lookup.get(block.name)
-                    if tool:
-                        result = execute_api_tool(tool, block.input, api_base_url, log)
+                    if block.name == "sleep":
+                        seconds = min(max(block.input.get("seconds", 5), 1), 60)
+                        log(f"[SLEEP] Waiting {seconds} seconds...")
+                        time.sleep(seconds)
+                        result = f"Slept for {seconds} seconds"
                     else:
-                        result = f"Unknown tool: {block.name}"
+                        tool = tool_lookup.get(block.name)
+                        if tool:
+                            result = execute_api_tool(tool, block.input, api_base_url, log)
+                        else:
+                            result = f"Unknown tool: {block.name}"
 
-                log(f"[TOOL_RESULT] {result[:5000]}")
+                    log(f"[TOOL_RESULT] {result[:5000]}")
 
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                })
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result,
+                    })
 
-        messages.append({"role": "assistant", "content": assistant_content})
+            messages.append({"role": "assistant", "content": assistant_content})
 
-        if tool_results:
-            messages.append({"role": "user", "content": tool_results})
-        else:
-            break
+            if tool_results:
+                messages.append({"role": "user", "content": tool_results})
+            else:
+                break
 
     log(f"[AGENT] Completed in {turns} turns")
 
@@ -525,9 +534,10 @@ class AgentRequest(BaseModel):
     thread_id: str
     api_base_url: str = "https://v2.api.policyengine.org"
     history: list[dict] | None = None
+    user_id: str | None = None
 
 
-@app.function(image=image, secrets=[anthropic_secret, supabase_secret], timeout=600)
+@app.function(image=image, secrets=[anthropic_secret, supabase_secret, logfire_secret], timeout=600)
 @modal.web_endpoint(method="POST")
 def run_agent_web(request: AgentRequest) -> dict:
     """Web endpoint wrapper for run_agent."""
@@ -536,6 +546,7 @@ def run_agent_web(request: AgentRequest) -> dict:
         thread_id=request.thread_id,
         api_base_url=request.api_base_url,
         history=request.history,
+        user_id=request.user_id,
     )
 
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "https://v2.api.policyengine.org";
@@ -14,6 +15,10 @@ export const maxDuration = 300; // Allow up to 5 minutes
 export async function POST(request: NextRequest) {
   const body: SpawnRequest = await request.json();
 
+  // Get user ID from session
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
   try {
     // Send request to Modal and wait for completion
     // Modal function streams logs to Supabase, frontend gets realtime updates
@@ -27,6 +32,7 @@ export async function POST(request: NextRequest) {
           thread_id: body.threadId,
           api_base_url: API_BASE_URL,
           history: body.history,
+          user_id: user?.id,
         }),
       }
     );
