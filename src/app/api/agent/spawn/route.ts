@@ -9,24 +9,38 @@ interface SpawnRequest {
   threadId: string;
 }
 
+export const maxDuration = 300; // Allow up to 5 minutes
+
 export async function POST(request: NextRequest) {
   const body: SpawnRequest = await request.json();
 
-  // Fire off the Modal function without waiting
-  // The Modal function will write logs to Supabase as it runs
-  // The frontend subscribes to realtime updates
-  fetch("https://nikhilwoodruff--policyengine-chat-agent-run-agent-web.modal.run", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      question: body.question,
-      thread_id: body.threadId,
-      api_base_url: API_BASE_URL,
-      history: body.history,
-    }),
-  }).catch((error) => {
-    console.error("Failed to spawn agent:", error);
-  });
+  try {
+    // Send request to Modal and wait for completion
+    // Modal function streams logs to Supabase, frontend gets realtime updates
+    const response = await fetch(
+      "https://nikhilwoodruff--policyengine-chat-agent-run-agent-web.modal.run",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: body.question,
+          thread_id: body.threadId,
+          api_base_url: API_BASE_URL,
+          history: body.history,
+        }),
+      }
+    );
 
-  return NextResponse.json({ status: "spawned" });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Modal returned error:", response.status, errorText);
+      return NextResponse.json({ status: "error", message: errorText }, { status: 500 });
+    }
+
+    const result = await response.json();
+    return NextResponse.json({ status: "completed", ...result });
+  } catch (error) {
+    console.error("Failed to run agent:", error);
+    return NextResponse.json({ status: "error", message: String(error) }, { status: 500 });
+  }
 }

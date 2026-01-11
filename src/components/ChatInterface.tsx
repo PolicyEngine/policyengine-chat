@@ -470,15 +470,26 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
       content: m.content,
     }));
 
-    fetch("/api/agent/spawn", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        question: userMessage,
-        history,
-        threadId,
-      }),
-    }).catch(console.error);
+    try {
+      const response = await fetch("/api/agent/spawn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: userMessage,
+          history,
+          threadId,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("Agent error:", error);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Failed to spawn agent:", error);
+      setIsLoading(false);
+    }
   }
 
   const parsedSteps = useMemo(() => {
