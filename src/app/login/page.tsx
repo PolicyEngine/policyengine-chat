@@ -9,18 +9,30 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const supabase = createClient();
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) return;
+    if (!email.trim()) return;
+    if (!isForgotPassword && !password.trim()) return;
 
     setIsLoading(true);
     setMessage(null);
 
-    if (isSignUp) {
+    if (isForgotPassword) {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/auth/callback?next=/login`,
+      });
+
+      if (error) {
+        setMessage({ type: "error", text: error.message });
+      } else {
+        setMessage({ type: "success", text: "Check your email for a password reset link." });
+      }
+    } else if (isSignUp) {
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password.trim(),
@@ -67,7 +79,7 @@ export default function LoginPage() {
         {/* Login card */}
         <div className="bg-white rounded-2xl border border-[var(--color-border)] p-6 shadow-sm">
           <h2 className="text-lg font-medium text-[var(--color-text-primary)] mb-4">
-            {isSignUp ? "Create an account" : "Sign in"}
+            {isForgotPassword ? "Reset password" : isSignUp ? "Create an account" : "Sign in"}
           </h2>
 
           <form onSubmit={handleSubmit}>
@@ -86,27 +98,42 @@ export default function LoginPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSignUp ? "Choose a password (min 6 chars)" : "Your password"}
-                  disabled={isLoading}
-                  className="w-full px-4 py-2.5 text-sm border border-[var(--color-border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-pe-green)] focus:border-transparent disabled:opacity-50 placeholder:text-[var(--color-text-muted)]"
-                />
-              </div>
+              {!isForgotPassword && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={isSignUp ? "Choose a password (min 6 chars)" : "Your password"}
+                    disabled={isLoading}
+                    className="w-full px-4 py-2.5 text-sm border border-[var(--color-border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-pe-green)] focus:border-transparent disabled:opacity-50 placeholder:text-[var(--color-text-muted)]"
+                  />
+                </div>
+              )}
             </div>
+
+            {!isSignUp && !isForgotPassword && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsForgotPassword(true);
+                  setMessage(null);
+                }}
+                className="mt-2 text-sm text-[var(--color-pe-green)] hover:text-[var(--color-pe-green-dark)]"
+              >
+                Forgot password?
+              </button>
+            )}
 
             <button
               type="submit"
-              disabled={isLoading || !email.trim() || !password.trim()}
+              disabled={isLoading || !email.trim() || (!isForgotPassword && !password.trim())}
               className="w-full mt-5 px-4 py-2.5 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? "Loading..." : isSignUp ? "Create account" : "Sign in"}
+              {isLoading ? "Loading..." : isForgotPassword ? "Send reset link" : isSignUp ? "Create account" : "Sign in"}
             </button>
           </form>
 
@@ -123,21 +150,34 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Toggle sign up / sign in */}
+          {/* Toggle sign up / sign in / forgot password */}
           <div className="mt-5 pt-5 border-t border-[var(--color-border)] text-center">
-            <p className="text-sm text-[var(--color-text-muted)]">
-              {isSignUp ? "Already have an account?" : "Don't have an account?"}
+            {isForgotPassword ? (
               <button
                 type="button"
                 onClick={() => {
-                  setIsSignUp(!isSignUp);
+                  setIsForgotPassword(false);
                   setMessage(null);
                 }}
-                className="ml-1 text-[var(--color-pe-green)] hover:text-[var(--color-pe-green-dark)] font-medium"
+                className="text-sm text-[var(--color-pe-green)] hover:text-[var(--color-pe-green-dark)] font-medium"
               >
-                {isSignUp ? "Sign in" : "Sign up"}
+                Back to sign in
               </button>
-            </p>
+            ) : (
+              <p className="text-sm text-[var(--color-text-muted)]">
+                {isSignUp ? "Already have an account?" : "Don't have an account?"}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    setMessage(null);
+                  }}
+                  className="ml-1 text-[var(--color-pe-green)] hover:text-[var(--color-pe-green-dark)] font-medium"
+                >
+                  {isSignUp ? "Sign in" : "Sign up"}
+                </button>
+              </p>
+            )}
           </div>
         </div>
 

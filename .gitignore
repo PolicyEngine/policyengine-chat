@@ -50,3 +50,4 @@ __pycache__/
 
 # supabase temp files
 supabase/.temp/
+.env*.local
