@@ -203,7 +203,11 @@ export function Sidebar() {
             {user && (
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-8 h-8 rounded-full bg-[var(--color-surface-sunken)] flex items-center justify-center">
-                  {user.user_metadata?.avatar_url ? (
+                  {user.is_anonymous ? (
+                    <svg className="w-4 h-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  ) : user.user_metadata?.avatar_url ? (
                     <img
                       src={user.user_metadata.avatar_url}
                       alt=""
@@ -217,21 +221,30 @@ export function Sidebar() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
-                    {user.user_metadata?.full_name || user.email?.split("@")[0]}
+                    {user.is_anonymous ? "Guest" : user.user_metadata?.full_name || user.email?.split("@")[0]}
                   </p>
                   <p className="text-xs text-[var(--color-text-muted)] truncate">
-                    {user.email}
+                    {user.is_anonymous ? "Sign in to save chats" : user.email}
                   </p>
                 </div>
-                <button
-                  onClick={signOut}
-                  className="p-2 hover:bg-[var(--color-surface-sunken)] rounded-lg transition-colors"
-                  title="Sign out"
-                >
-                  <svg className="w-4 h-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </button>
+                {user.is_anonymous ? (
+                  <button
+                    onClick={() => router.push("/login")}
+                    className="px-3 py-1.5 text-xs font-medium text-[var(--color-pe-green)] hover:bg-[var(--color-surface-sunken)] rounded-lg transition-colors"
+                  >
+                    Sign in
+                  </button>
+                ) : (
+                  <button
+                    onClick={signOut}
+                    className="p-2 hover:bg-[var(--color-surface-sunken)] rounded-lg transition-colors"
+                    title="Sign out"
+                  >
+                    <svg className="w-4 h-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </button>
+                )}
               </div>
             )}
             <a

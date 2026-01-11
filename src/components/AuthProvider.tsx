@@ -24,13 +24,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
 
   useEffect(() => {
-    const getUser = async () => {
+    const getOrCreateUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setIsLoading(false);
+
+      if (user) {
+        setUser(user);
+        setIsLoading(false);
+      } else {
+        // Sign in anonymously
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (!error && data.user) {
+          setUser(data.user);
+        }
+        setIsLoading(false);
+      }
     };
 
-    getUser();
+    getOrCreateUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
