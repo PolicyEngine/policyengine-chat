@@ -477,8 +477,11 @@ def run_agent(
     # Create lookup for API execution (needs full tool with _meta)
     tool_lookup = {t["name"]: t for t in full_tools}
 
-    # Use full tools (prompt caching makes this efficient)
-    claude_tools = full_tools + [SLEEP_TOOL, CREATE_ARTIFACT_TOOL]
+    # Strip _meta from tools for Claude (it's only used internally for API execution)
+    claude_tools = [
+        {k: v for k, v in t.items() if k != "_meta"}
+        for t in full_tools
+    ] + [SLEEP_TOOL, CREATE_ARTIFACT_TOOL]
 
     client = anthropic.Anthropic()
     logfire.instrument_anthropic(client)
