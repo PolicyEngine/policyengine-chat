@@ -162,29 +162,33 @@ SLEEP_TOOL = {
 
 CREATE_ARTIFACT_TOOL = {
     "name": "create_artifact",
-    "description": """Create an interactive artifact to visualize data or results.
+    "description": """Create a single, polished interactive artifact. Only call once per visualization.
+
+IMPORTANT: Create ONE artifact per request. Never create empty or placeholder artifacts.
 
 Types:
 - "html": Static HTML/CSS/JS with CDN libraries (preferred for charts/visualizations)
 - "react": React app built with bun. Content is App.tsx code.
 - "script": Node.js script that outputs HTML to stdout.
 
-Style requirements:
-- Fill container responsively: use width:100%, height:100vh, no margins/padding on body
-- No scrollbars: content must fit within the viewport
-- Use CSS: html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+Layout requirements:
+- Fill container: html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+- No scrollbars - content must fit viewport
 
 Charts - use D3.js:
-- Load via: <script src="https://d3js.org/d3.v7.min.js"></script>
-- Make charts responsive: use viewBox, preserve aspect ratio
-- Use ResizeObserver to redraw on container resize
-- PolicyEngine brand colour: #2C6496 (teal)
+- Load: <script src="https://d3js.org/d3.v7.min.js"></script>
+- Responsive SVG: use viewBox + preserveAspectRatio="xMidYMid meet"
+- PolicyEngine teal: #2C6496
 
-Example responsive D3 pattern:
-const svg = d3.select("#chart").append("svg")
-  .attr("viewBox", "0 0 800 400")
-  .attr("preserveAspectRatio", "xMidYMid meet")
-  .style("width", "100%").style("height", "100%");""",
+Design principles - create DISTINCTIVE, production-grade visuals:
+- Typography: Use beautiful, unique fonts (Google Fonts). Avoid generic Inter/Arial/Roboto.
+- Color: Commit to a cohesive palette. Dominant colors with sharp accents.
+- Motion: Subtle animations for polish - staggered reveals, hover states.
+- Composition: Generous whitespace OR controlled density. Asymmetry can be striking.
+- Atmosphere: Gradients, subtle shadows, textures - not flat solid colors.
+
+NEVER create generic "AI slop": no purple gradients on white, no cookie-cutter layouts.
+Each artifact should feel intentionally designed for its specific context.""",
     "input_schema": {
         "type": "object",
         "properties": {

@@ -628,6 +628,16 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
 
     await supabase.from("agent_logs").delete().eq("thread_id", threadId);
 
+    // Optimistic update - show message immediately
+    const tempId = `temp-${Date.now()}`;
+    setMessages((prev) => [...prev, {
+      id: tempId,
+      thread_id: threadId,
+      role: "user",
+      content: userMessage,
+      created_at: new Date().toISOString(),
+    }]);
+
     await supabase.from("messages").insert({
       thread_id: threadId,
       role: "user",
