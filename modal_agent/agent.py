@@ -178,9 +178,31 @@ Layout requirements:
 - No scrollbars - content must fit viewport
 - Use % or vw/vh units, not fixed pixels
 
-Charts - use D3.js:
+Charts - use D3.js with PolicyEngine style:
 - Load: <script src="https://d3js.org/d3.v7.min.js"></script>
 - Responsive SVG: use viewBox + preserveAspectRatio="xMidYMid meet"
+
+Bar chart defaults:
+- NO borders/strokes on bars - use clean solid fills only
+- Positive values: #2C6496 (PolicyEngine teal)
+- Negative values: #D76D6D (muted red)
+- Neutral/baseline: #808080 (gray)
+- Bar corner radius: 2-3px for subtle rounding (not sharp corners)
+
+Axes and labels:
+- Axis lines: #BDBDBD, 1px - subtle, not heavy
+- Grid lines: #E0E0E0, dashed or dotted - barely visible
+- Axis text: #333, 11-12px, system-ui or Roboto
+- Remove axis lines where grid provides context
+
+Spacing:
+- Generous padding: 40-60px margins for labels
+- Bar spacing: 0.2-0.3 padding ratio between bars
+- Group spacing: slightly wider between groups
+
+Data labels (optional):
+- Place value labels inside or above bars, not in legend
+- Use #333 or white depending on background contrast
 
 PolicyEngine brand:
 - Primary teal: #2C6496
