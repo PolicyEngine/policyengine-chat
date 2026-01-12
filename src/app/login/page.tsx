@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -10,19 +10,36 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [isResetPassword, setIsResetPassword] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("reset") === "true") {
+      setIsResetPassword(true);
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!isResetPassword && !email.trim()) return;
     if (!isForgotPassword && !password.trim()) return;
 
     setIsLoading(true);
     setMessage(null);
 
-    if (isForgotPassword) {
+    if (isResetPassword) {
+      const { error } = await supabase.auth.updateUser({ password: password.trim() });
+      if (error) {
+        setMessage({ type: "error", text: error.message });
+      } else {
+        setMessage({ type: "success", text: "Password updated successfully!" });
+        setIsResetPassword(false);
+        router.push("/");
+      }
+    } else if (isForgotPassword) {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: `${window.location.origin}/auth/callback?next=/login`,
       });
@@ -79,24 +96,26 @@ export default function LoginPage() {
         {/* Login card */}
         <div className="bg-white rounded-2xl border border-[var(--color-border)] p-6 shadow-sm">
           <h2 className="text-lg font-medium text-[var(--color-text-primary)] mb-4">
-            {isForgotPassword ? "Reset password" : isSignUp ? "Create an account" : "Sign in"}
+            {isResetPassword ? "Set new password" : isForgotPassword ? "Reset password" : isSignUp ? "Create an account" : "Sign in"}
           </h2>
 
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  disabled={isLoading}
-                  className="w-full px-4 py-2.5 text-sm border border-[var(--color-border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-pe-green)] focus:border-transparent disabled:opacity-50 placeholder:text-[var(--color-text-muted)]"
-                />
-              </div>
+              {!isResetPassword && (
+                <div>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    disabled={isLoading}
+                    className="w-full px-4 py-2.5 text-sm border border-[var(--color-border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-pe-green)] focus:border-transparent disabled:opacity-50 placeholder:text-[var(--color-text-muted)]"
+                  />
+                </div>
+              )}
 
               {!isForgotPassword && (
                 <div>
@@ -107,7 +126,7 @@ export default function LoginPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={isSignUp ? "Choose a password (min 6 chars)" : "Your password"}
+                    placeholder={isResetPassword ? "Enter new password (min 6 chars)" : isSignUp ? "Choose a password (min 6 chars)" : "Your password"}
                     disabled={isLoading}
                     className="w-full px-4 py-2.5 text-sm border border-[var(--color-border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-pe-green)] focus:border-transparent disabled:opacity-50 placeholder:text-[var(--color-text-muted)]"
                   />
@@ -115,7 +134,7 @@ export default function LoginPage() {
               )}
             </div>
 
-            {!isSignUp && !isForgotPassword && (
+            {!isSignUp && !isForgotPassword && !isResetPassword && (
               <button
                 type="button"
                 onClick={() => {
@@ -130,10 +149,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={isLoading || !email.trim() || (!isForgotPassword && !password.trim())}
+              disabled={isLoading || (!isResetPassword && !email.trim()) || (!isForgotPassword && !password.trim())}
               className="w-full mt-5 px-4 py-2.5 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {isLoading ? "Loading..." : isForgotPassword ? "Send reset link" : isSignUp ? "Create account" : "Sign in"}
+              {isLoading ? "Loading..." : isResetPassword ? "Update password" : isForgotPassword ? "Send reset link" : isSignUp ? "Create account" : "Sign in"}
             </button>
           </form>
 
@@ -151,34 +170,36 @@ export default function LoginPage() {
           )}
 
           {/* Toggle sign up / sign in / forgot password */}
-          <div className="mt-5 pt-5 border-t border-[var(--color-border)] text-center">
-            {isForgotPassword ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsForgotPassword(false);
-                  setMessage(null);
-                }}
-                className="text-sm text-[var(--color-pe-green)] hover:text-[var(--color-pe-green-dark)] font-medium"
-              >
-                Back to sign in
-              </button>
-            ) : (
-              <p className="text-sm text-[var(--color-text-muted)]">
-                {isSignUp ? "Already have an account?" : "Don't have an account?"}
+          {!isResetPassword && (
+            <div className="mt-5 pt-5 border-t border-[var(--color-border)] text-center">
+              {isForgotPassword ? (
                 <button
                   type="button"
                   onClick={() => {
-                    setIsSignUp(!isSignUp);
+                    setIsForgotPassword(false);
                     setMessage(null);
                   }}
-                  className="ml-1 text-[var(--color-pe-green)] hover:text-[var(--color-pe-green-dark)] font-medium"
+                  className="text-sm text-[var(--color-pe-green)] hover:text-[var(--color-pe-green-dark)] font-medium"
                 >
-                  {isSignUp ? "Sign in" : "Sign up"}
+                  Back to sign in
                 </button>
-              </p>
-            )}
-          </div>
+              ) : (
+                <p className="text-sm text-[var(--color-text-muted)]">
+                  {isSignUp ? "Already have an account?" : "Don't have an account?"}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSignUp(!isSignUp);
+                      setMessage(null);
+                    }}
+                    className="ml-1 text-[var(--color-pe-green)] hover:text-[var(--color-pe-green-dark)] font-medium"
+                  >
+                    {isSignUp ? "Sign in" : "Sign up"}
+                  </button>
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
