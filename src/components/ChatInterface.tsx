@@ -328,12 +328,14 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
   );
 }
 
-function CollapsedLogs({ logs }: { logs: AgentLog[] }) {
+function CollapsedLogs({ logs }: { logs: AgentLog[] | string[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const parsedSteps = useMemo(() => {
-    return logs
-      .map(log => parseLogEntry(log.message))
+    // Handle both AgentLog[] and string[] (from tool_logs)
+    const messages = logs.map(log => typeof log === "string" ? log : log.message);
+    return messages
+      .map(msg => parseLogEntry(msg))
       .filter(step => step.type !== "unknown" && step.type !== "agent");
   }, [logs]);
 
@@ -838,9 +840,9 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                 <div className="flex gap-3">
                   <img src="/logos/teal-square.svg" alt="PolicyEngine" className="w-8 h-8 flex-shrink-0" />
                   <div className="flex-1">
-                    {/* Collapsed logs for this message */}
-                    {messageLogs[message.id] && messageLogs[message.id].length > 0 && (
-                      <CollapsedLogs logs={messageLogs[message.id]} />
+                    {/* Collapsed logs for this message - prefer persisted tool_logs, fall back to realtime */}
+                    {(message.tool_logs?.length || messageLogs[message.id]?.length) && (
+                      <CollapsedLogs logs={message.tool_logs || messageLogs[message.id] || []} />
                     )}
                     <div className="bg-white border border-[var(--color-border)] rounded-2xl rounded-tl-md px-5 py-4 shadow-sm relative">
                       <CopyButton

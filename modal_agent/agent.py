@@ -528,8 +528,12 @@ def run_agent(
     supabase_key = os.environ["SUPABASE_SERVICE_KEY"]
     supabase = create_client(supabase_url, supabase_key)
 
+    # Track logs in memory for saving with the message
+    collected_logs: list[str] = []
+
     def log(msg: str) -> None:
         print(msg)
+        collected_logs.append(msg)
         try:
             supabase.table("agent_logs").insert({
                 "thread_id": thread_id,
@@ -698,13 +702,14 @@ def run_agent(
     except Exception as e:
         print(f"Failed to update token counts: {e}")
 
-    # Save the assistant message to Supabase
+    # Save the assistant message to Supabase with tool logs
     if final_response:
         try:
             supabase.table("messages").insert({
                 "thread_id": thread_id,
                 "role": "assistant",
                 "content": final_response,
+                "tool_logs": collected_logs,
             }).execute()
         except Exception as e:
             print(f"Failed to save message: {e}")

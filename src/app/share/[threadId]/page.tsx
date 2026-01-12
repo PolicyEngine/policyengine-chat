@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import CopyThreadButton from "./CopyThreadButton";
+import { ToolLogs } from "./ToolLogs";
 
 interface PageProps {
   params: Promise<{ threadId: string }>;
@@ -78,11 +79,17 @@ export default async function SharedChatPage({ params }: PageProps) {
               ) : (
                 <div className="flex gap-3">
                   <img src="/logos/teal-square.svg" alt="PolicyEngine" className="w-8 h-8 flex-shrink-0" />
-                  <div className="flex-1 bg-white border border-[var(--color-border)] rounded-2xl rounded-tl-md px-5 py-4 shadow-sm">
-                    <div className="response-content">
-                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                        {message.content}
-                      </ReactMarkdown>
+                  <div className="flex-1">
+                    {/* Tool logs */}
+                    {message.tool_logs && message.tool_logs.length > 0 && (
+                      <ToolLogs logs={message.tool_logs} />
+                    )}
+                    <div className="bg-white border border-[var(--color-border)] rounded-2xl rounded-tl-md px-5 py-4 shadow-sm">
+                      <div className="response-content">
+                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                     {/* Show artifacts after this message */}
                     {artifacts?.filter(a => a.message_id === message.id ||
