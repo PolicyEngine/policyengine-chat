@@ -28,6 +28,13 @@ function LoginForm() {
     if (searchParams.get("reset") === "true") {
       setIsResetPassword(true);
     }
+
+    // Handle Supabase password recovery hash fragment
+    const hash = window.location.hash;
+    if (hash && hash.includes("type=recovery")) {
+      setIsResetPassword(true);
+      // Supabase client will automatically pick up the tokens from the hash
+    }
   }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
@@ -9,6 +10,14 @@ export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
   const supabase = createClient();
+
+  // Handle Supabase password recovery hash fragment
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes("type=recovery")) {
+      router.push("/login?reset=true");
+    }
+  }, [router]);
 
   async function startNewChat() {
     if (!user) return;
