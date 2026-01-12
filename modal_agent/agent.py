@@ -488,7 +488,7 @@ def run_agent(
     history: list[dict] | None = None,
     max_turns: int = 30,
     user_id: str | None = None,
-    model: str = "claude-opus-4-5-20251101",
+    model: str = "claude-opus-4-5",
 ) -> dict:
     """Run agentic loop to answer a policy question.
 

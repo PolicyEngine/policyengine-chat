@@ -404,7 +404,6 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const [tokenCost, setTokenCost] = useState<number | null>(null);
-  const [model, setModel] = useState<"claude-sonnet-4-5" | "claude-opus-4-5-20251101">("claude-opus-4-5-20251101");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
@@ -672,7 +671,6 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
           question: userMessage,
           history,
           threadId,
-          model,
         }),
       });
 
@@ -770,15 +768,6 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                 </div>
               )}
             </div>
-            {/* Model selector */}
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value as typeof model)}
-              className="px-2 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer border-none outline-none"
-            >
-              <option value="claude-sonnet-4-5" className="text-gray-900">Sonnet 4.5</option>
-              <option value="claude-opus-4-5-20251101" className="text-gray-900">Opus 4.5</option>
-            </select>
             {/* Token cost */}
             {tokenCost !== null && tokenCost > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 rounded-lg">

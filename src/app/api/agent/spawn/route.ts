@@ -8,7 +8,6 @@ interface SpawnRequest {
   question: string;
   history: { role: string; content: string }[];
   threadId: string;
-  model?: string;
 }
 
 export const maxDuration = 300; // Allow up to 5 minutes
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
           api_base_url: API_BASE_URL,
           history: body.history,
           user_id: user?.id,
-          model: body.model || "claude-opus-4-5-20251101",
+          model: "claude-opus-4-5",
         }),
       }
     );
