@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/components/AuthProvider";
@@ -10,14 +10,90 @@ export default function Home() {
   const router = useRouter();
   const { user } = useAuth();
   const supabase = createClient();
+  const [isRecovery, setIsRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Handle Supabase password recovery hash fragment
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes("type=recovery")) {
-      router.push("/login?reset=true");
+      setIsRecovery(true);
     }
-  }, [router]);
+  }, []);
+
+  async function handlePasswordReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newPassword.trim()) return;
+
+    setIsLoading(true);
+    setMessage(null);
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword.trim() });
+
+    if (error) {
+      setMessage({ type: "error", text: error.message });
+    } else {
+      setMessage({ type: "success", text: "Password updated successfully!" });
+      setTimeout(() => {
+        window.location.hash = "";
+        setIsRecovery(false);
+        router.push("/");
+      }, 1500);
+    }
+    setIsLoading(false);
+  }
+
+  if (isRecovery) {
+    return (
+      <div className="min-h-screen bg-[var(--color-surface)] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-[var(--color-pe-green)] flex items-center justify-center mx-auto mb-4 shadow-lg">
+              <span className="text-white font-bold text-xl">PE</span>
+            </div>
+            <h1 className="text-2xl font-semibold text-[var(--color-text-primary)]">
+              Set new password
+            </h1>
+          </div>
+          <div className="bg-white rounded-2xl border border-[var(--color-border)] p-6 shadow-sm">
+            <form onSubmit={handlePasswordReset}>
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
+                  New password
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 6 chars)"
+                  disabled={isLoading}
+                  className="w-full px-4 py-2.5 text-sm border border-[var(--color-border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--color-pe-green)] focus:border-transparent disabled:opacity-50 placeholder:text-[var(--color-text-muted)]"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading || !newPassword.trim()}
+                className="w-full mt-5 px-4 py-2.5 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-xl text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isLoading ? "Updating..." : "Update password"}
+              </button>
+            </form>
+            {message && (
+              <div className={`mt-4 p-3 rounded-lg text-sm ${
+                message.type === "success"
+                  ? "bg-green-50 text-green-700 border border-green-200"
+                  : "bg-red-50 text-red-700 border border-red-200"
+              }`}>
+                {message.text}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   async function startNewChat() {
     if (!user) return;
