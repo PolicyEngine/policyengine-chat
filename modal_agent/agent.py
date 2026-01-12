@@ -45,6 +45,7 @@ Parameters and datasets from both countries are in the same database. Without th
 2. **Parameter lookup**:
    - GET /parameters/?search=...&tax_benefit_model_name=policyengine-uk (ALWAYS include country filter)
    - GET /parameter-values/?parameter_id=...&current=true for the current value
+   - IMPORTANT: Parameter values are returned in REVERSE chronological order (most recent FIRST). The first value in the list is the current/active value.
 
 3. **Economic impact analysis** (budget impact, decile impacts):
    - GET /parameters/?search=...&tax_benefit_model_name=policyengine-uk to find parameter_id
