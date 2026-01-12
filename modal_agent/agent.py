@@ -28,6 +28,10 @@ SYSTEM_PROMPT = """You are a PolicyEngine assistant that helps users understand 
 
 You have access to the full PolicyEngine API.
 
+## CRITICAL: Use get_tool_help before calling API tools
+
+Tool descriptions are minimal to save tokens. Before using any API tool for the first time, call `get_tool_help` with the tool name to get full documentation including required parameters. You can batch multiple get_tool_help calls in one turn.
+
 ## CRITICAL: Always filter by country
 
 When searching for parameters or datasets, ALWAYS include tax_benefit_model_name:
@@ -153,6 +157,21 @@ SLEEP_TOOL = {
     },
 }
 
+GET_TOOL_HELP_TOOL = {
+    "name": "get_tool_help",
+    "description": "Get detailed documentation for a tool before using it. Call this the first time you use any API tool.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "tool_name": {
+                "type": "string",
+                "description": "Name of the tool to get help for",
+            }
+        },
+        "required": ["tool_name"],
+    },
+}
+
 
 def fetch_openapi_spec(api_base_url: str) -> dict:
     """Fetch and cache OpenAPI spec."""
@@ -223,7 +242,7 @@ def schema_to_json_schema(spec: dict, schema: dict) -> dict:
 
 
 def openapi_to_claude_tools(spec: dict) -> list[dict]:
-    """Convert OpenAPI spec to Claude tool definitions."""
+    """Convert OpenAPI spec to Claude tool definitions (full version with all details)."""
     tools = []
 
     for path, methods in spec.get("paths", {}).items():
@@ -296,6 +315,57 @@ def openapi_to_claude_tools(spec: dict) -> list[dict]:
             })
 
     return tools
+
+
+def create_minimal_tool_stubs(full_tools: list[dict]) -> list[dict]:
+    """Create minimal tool stubs with just name and short description.
+
+    Full documentation is available via get_tool_help tool.
+    """
+    stubs = []
+    for tool in full_tools:
+        # Extract just the first line (METHOD /path) as the short description
+        desc = tool["description"]
+        short_desc = desc.split("\n")[0] if "\n" in desc else desc
+
+        stubs.append({
+            "name": tool["name"],
+            "description": short_desc,
+            # Minimal schema - just indicate it takes parameters
+            "input_schema": {"type": "object", "properties": {}},
+        })
+    return stubs
+
+
+def get_tool_help_response(tool_name: str, full_tools: list[dict]) -> str:
+    """Return full documentation for a tool."""
+    for tool in full_tools:
+        if tool["name"] == tool_name:
+            # Format full documentation
+            doc = f"## {tool['name']}\n\n"
+            doc += f"{tool['description']}\n\n"
+            doc += "### Parameters\n\n"
+            schema = tool.get("input_schema", {})
+            props = schema.get("properties", {})
+            required = schema.get("required", [])
+
+            if props:
+                for prop_name, prop_schema in props.items():
+                    req_marker = " (required)" if prop_name in required else ""
+                    prop_type = prop_schema.get("type", "any")
+                    prop_desc = prop_schema.get("description", "")
+                    doc += f"- **{prop_name}**{req_marker}: {prop_type}"
+                    if prop_desc:
+                        doc += f" - {prop_desc}"
+                    doc += "\n"
+            else:
+                doc += "No parameters.\n"
+
+            return doc
+
+    # Tool not found - list available tools
+    tool_names = [t["name"] for t in full_tools]
+    return f"Tool '{tool_name}' not found. Available tools:\n" + "\n".join(f"- {n}" for n in tool_names[:30])
 
 
 def execute_api_tool(
@@ -423,15 +493,15 @@ def run_agent(
     # Fetch and convert OpenAPI spec to tools
     log("[AGENT] Fetching OpenAPI spec...")
     spec = fetch_openapi_spec(api_base_url)
-    tools = openapi_to_claude_tools(spec)
-    log(f"[AGENT] Loaded {len(tools)} API tools")
+    full_tools = openapi_to_claude_tools(spec)
+    log(f"[AGENT] Loaded {len(full_tools)} API tools")
 
-    tool_lookup = {t["name"]: t for t in tools}
+    # Create lookup for API execution (needs full tool with _meta)
+    tool_lookup = {t["name"]: t for t in full_tools}
 
-    claude_tools = [
-        {k: v for k, v in t.items() if k != "_meta"} for t in tools
-    ]
-    claude_tools.append(SLEEP_TOOL)
+    # Create minimal stubs for Claude (reduces token cost)
+    minimal_stubs = create_minimal_tool_stubs(full_tools)
+    claude_tools = minimal_stubs + [SLEEP_TOOL, GET_TOOL_HELP_TOOL]
 
     client = anthropic.Anthropic()
     logfire.instrument_anthropic(client)
@@ -446,6 +516,12 @@ def run_agent(
     turns = 0
     total_input_tokens = 0
     total_output_tokens = 0
+    total_cache_read_tokens = 0
+    total_cache_creation_tokens = 0
+
+    # Add cache_control to tools (only last item needs it to cache the whole prefix)
+    cached_tools = claude_tools[:-1] + [{**claude_tools[-1], "cache_control": {"type": "ephemeral"}}]
+    cached_system = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
 
     with logfire.span("agent_conversation", thread_id=thread_id, user_id=user_id or "anonymous"):
         while turns < max_turns:
@@ -453,16 +529,18 @@ def run_agent(
             log(f"[AGENT] Turn {turns}")
 
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-5",
                 max_tokens=4096,
-                system=SYSTEM_PROMPT,
-                tools=claude_tools,
+                system=cached_system,
+                tools=cached_tools,
                 messages=messages,
             )
 
             # Track token usage
             total_input_tokens += response.usage.input_tokens
             total_output_tokens += response.usage.output_tokens
+            total_cache_read_tokens += getattr(response.usage, "cache_read_input_tokens", 0) or 0
+            total_cache_creation_tokens += getattr(response.usage, "cache_creation_input_tokens", 0) or 0
 
             log(f"[AGENT] Stop reason: {response.stop_reason}")
 
@@ -483,6 +561,10 @@ def run_agent(
                         log(f"[SLEEP] Waiting {seconds} seconds...")
                         time.sleep(seconds)
                         result = f"Slept for {seconds} seconds"
+                    elif block.name == "get_tool_help":
+                        tool_name = block.input.get("tool_name", "")
+                        log(f"[TOOL_HELP] Fetching docs for: {tool_name}")
+                        result = get_tool_help_response(tool_name, full_tools)
                     else:
                         tool = tool_lookup.get(block.name)
                         if tool:
@@ -505,7 +587,7 @@ def run_agent(
             else:
                 break
 
-    log(f"[AGENT] Completed in {turns} turns, {total_input_tokens} input tokens, {total_output_tokens} output tokens")
+    log(f"[AGENT] Completed in {turns} turns, {total_input_tokens} input tokens, {total_output_tokens} output tokens, {total_cache_read_tokens} cache read, {total_cache_creation_tokens} cache created")
 
     # Calculate cost (Claude Sonnet pricing: $3/1M input, $15/1M output)
     input_cost = (total_input_tokens / 1_000_000) * 3
@@ -540,7 +622,7 @@ def run_agent(
         # Generate a title for the thread
         try:
             title_response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-5",
                 max_tokens=50,
                 messages=[
                     {"role": "user", "content": question},
