@@ -9,10 +9,8 @@ import re
 import time
 from typing import Callable
 
-import anthropic
 import modal
 import requests
-from supabase import create_client
 
 image = modal.Image.debian_slim(python_version="3.12").pip_install(
     "anthropic", "requests", "supabase", "fastapi", "logfire"
@@ -446,7 +444,9 @@ def run_agent(
 
     Stores logs in Supabase agent_logs table and final result as a message.
     """
+    import anthropic
     import logfire
+    from supabase import create_client
 
     # Configure logfire for token tracking
     logfire.configure()
