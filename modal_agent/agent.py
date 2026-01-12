@@ -172,13 +172,21 @@ Types:
 - "script": Node.js script that outputs HTML to stdout.
 
 Layout requirements:
+- Artifact displays in 16:9 box inline, OR fullscreen when opened in new tab
+- Must look good at BOTH sizes - use responsive design
 - Fill container: html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
 - No scrollbars - content must fit viewport
+- Use % or vw/vh units, not fixed pixels
 
 Charts - use D3.js:
 - Load: <script src="https://d3js.org/d3.v7.min.js"></script>
 - Responsive SVG: use viewBox + preserveAspectRatio="xMidYMid meet"
-- PolicyEngine teal: #2C6496
+
+PolicyEngine brand:
+- Primary teal: #2C6496
+- Title: top-left, clean sans-serif (e.g. Roboto), sentence case
+- Citation footer: bottom-right, small text "Source: PolicyEngine" with link to policyengine.org
+- Keep branding subtle - focus on the data visualization
 
 Design principles - create DISTINCTIVE, production-grade visuals:
 - Typography: Use beautiful, unique fonts (Google Fonts). Avoid generic Inter/Arial/Roboto.
