@@ -25,10 +25,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const getOrCreateUser = async () => {
+      // Check if this is a password recovery flow - don't sign in anonymously
+      const isRecovery = typeof window !== "undefined" &&
+        window.location.hash.includes("type=recovery");
+
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
         setUser(user);
+        setIsLoading(false);
+      } else if (isRecovery) {
+        // Wait for recovery token to be processed, don't sign in anonymously
         setIsLoading(false);
       } else {
         // Sign in anonymously

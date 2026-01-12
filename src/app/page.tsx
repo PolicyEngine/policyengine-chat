@@ -19,9 +19,14 @@ export default function Home() {
   useEffect(() => {
     const hash = window.location.hash;
     if (hash && hash.includes("type=recovery")) {
-      setIsRecovery(true);
+      // Wait for Supabase to process the recovery token from the hash
+      supabase.auth.onAuthStateChange((event) => {
+        if (event === "PASSWORD_RECOVERY") {
+          setIsRecovery(true);
+        }
+      });
     }
-  }, []);
+  }, [supabase.auth]);
 
   async function handlePasswordReset(e: React.FormEvent) {
     e.preventDefault();
