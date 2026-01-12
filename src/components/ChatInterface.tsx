@@ -701,16 +701,16 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="px-6 py-3 bg-gradient-to-r from-[var(--color-pe-green)] to-[var(--color-pe-green-dark)] shadow-md">
+      <div className="px-3 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-[var(--color-pe-green)] to-[var(--color-pe-green-dark)] shadow-md">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/logos/white-square.svg" alt="PolicyEngine" className="w-8 h-8" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <img src="/logos/white-square.svg" alt="PolicyEngine" className="w-6 h-6 sm:w-8 sm:h-8" />
             <div>
-              <h2 className="text-white font-semibold text-sm">Policy analyst</h2>
-              <p className="text-white/70 text-xs">UK and US tax-benefit policy</p>
+              <h2 className="text-white font-semibold text-xs sm:text-sm">Policy analyst</h2>
+              <p className="text-white/70 text-[10px] sm:text-xs hidden sm:block">UK and US tax-benefit policy</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {/* Copy thread button */}
             {messages.length > 0 && (
               <button
@@ -720,20 +720,20 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer"
                 title="Copy entire conversation"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-                {copied ? "Copied!" : "Copy all"}
+                <span className="hidden sm:inline">{copied ? "Copied!" : "Copy all"}</span>
               </button>
             )}
             {/* Share button */}
             <div className="relative">
               <button
                 onClick={() => setShowShareMenu(!showShareMenu)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -768,9 +768,9 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                 </div>
               )}
             </div>
-            {/* Token cost */}
+            {/* Token cost - hide on small screens */}
             {tokenCost !== null && tokenCost > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 rounded-lg">
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white/20 rounded-lg">
                 <svg className="w-3.5 h-3.5 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -780,9 +780,9 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
               </div>
             )}
             {/* Status indicator */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-lg">
+            <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/20 rounded-lg">
               <div className={`w-2 h-2 rounded-full ${isLoading ? "bg-amber-300 animate-pulse-dot" : "bg-green-300"}`} />
-              <span className="text-white/80 text-xs font-medium">
+              <span className="text-white/80 text-xs font-medium hidden sm:inline">
                 {isLoading ? "Working..." : "Ready"}
               </span>
             </div>
@@ -791,7 +791,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
         {messages.length === 0 && !isLoading && (
           <div className="h-full flex flex-col justify-center">
             <div className="text-center mb-8">
@@ -895,20 +895,20 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
       </div>
 
       {/* Input */}
-      <div className="border-t border-[var(--color-border)] p-4 bg-[var(--color-surface)]">
-        <form onSubmit={sendMessage} className="flex gap-3 max-w-3xl mx-auto">
+      <div className="border-t border-[var(--color-border)] p-2 sm:p-4 bg-[var(--color-surface)]">
+        <form onSubmit={sendMessage} className="flex gap-2 sm:gap-3 max-w-3xl mx-auto">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask a policy question..."
             disabled={isLoading}
-            className="flex-1 px-4 py-3 text-[14px] border border-[var(--color-border)] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-pe-green)] focus:border-transparent disabled:opacity-50 placeholder:text-[var(--color-text-muted)]"
+            className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-[14px] border border-[var(--color-border)] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-pe-green)] focus:border-transparent disabled:opacity-50 placeholder:text-[var(--color-text-muted)]"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="px-5 py-3 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-xl text-[14px] font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
+            className="px-3 sm:px-5 py-2.5 sm:py-3 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-xl text-[14px] font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
           >
             {isLoading ? (
               <>
