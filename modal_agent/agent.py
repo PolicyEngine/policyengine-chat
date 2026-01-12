@@ -54,9 +54,32 @@ Parameters and datasets from both countries are in the same database. Without th
    - GET /parameter-values/?parameter_id=...&current=true for the current value
    - IMPORTANT: Parameter values are returned in REVERSE chronological order (most recent FIRST). The first value in the list is the current/active value.
 
-3. **Economic impact analysis** (budget impact, decile impacts):
-   - GET /parameters/?search=...&tax_benefit_model_name=policyengine-uk to find parameter_id
-   - POST /policies/ to create reform with parameter_values
+3. **Creating policies with reforms**:
+   - First find parameter IDs with GET /parameters/?search=...
+   - Get current values with GET /parameter-values/?parameter_id=...&current=true
+   - POST /policies/ with parameter_values array in the body:
+     ```json
+     {
+       "name": "Policy name",
+       "description": "Description",
+       "parameter_values": [
+         {"parameter_id": "uuid", "value_json": 123.45, "start_date": "2026-01-01"}
+       ]
+     }
+     ```
+   - CRITICAL: You MUST include parameter_values in the request body. A policy with just name/description does nothing!
+
+4. **CRITICAL: Always validate policies before economic impact**:
+   - After creating a policy, ALWAYS run a household calculation to verify it works
+   - Compare baseline (no policy_id) vs reform (with policy_id) for a relevant household
+   - Example: For UC changes, test a single unemployed adult over 25
+   - If both calculations return the same values, the policy is NOT working - debug before proceeding
+   - Economic impact analysis costs significant compute time - don't waste it on broken policies
+
+5. **Economic impact analysis** (budget impact, decile impacts):
+   - GET /parameters/?search=... to find parameter_id
+   - Create policy with parameter_values (see step 3)
+   - **VALIDATE with household calculation first** (see step 4)
    - GET /datasets/?tax_benefit_model_name=policyengine-uk to find dataset_id
    - POST /analysis/economic-impact with tax_benefit_model_name, policy_id and dataset_id
    - GET /analysis/economic-impact/{report_id} for results (includes decile_impacts and program_statistics)
