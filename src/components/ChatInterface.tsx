@@ -307,9 +307,9 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
         </div>
       </div>
       {isExpanded && (
-        <div className="relative">
+        <div className="relative" style={{ aspectRatio: "16/9" }}>
           {isLoading && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--color-surface-sunken)] h-96">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--color-surface-sunken)]">
               <div className="w-8 h-8 border-2 border-[var(--color-pe-green)] border-t-transparent rounded-full animate-spin mb-3" />
               <span className="text-sm text-[var(--color-text-muted)]">Building artifact...</span>
               <span className="text-xs text-[var(--color-text-muted)] mt-1">This may take a moment on first load</span>
@@ -317,7 +317,7 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
           )}
           <iframe
             src={artifactUrl}
-            className={`w-full h-96 border-0 ${isLoading ? "invisible" : ""}`}
+            className={`w-full h-full border-0 absolute inset-0 ${isLoading ? "invisible" : ""}`}
             sandbox="allow-scripts"
             title={artifact.title}
             onLoad={() => setIsLoading(false)}
@@ -427,7 +427,17 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
         (payload) => {
           const newMessage = payload.new as Message;
           setMessages((prev) => {
+            // Check for duplicate by ID or by content (for optimistic updates)
             if (prev.some((m) => m.id === newMessage.id)) return prev;
+            // Replace temp message with real one (same role + content)
+            const tempIndex = prev.findIndex(
+              (m) => m.id.startsWith("temp-") && m.role === newMessage.role && m.content === newMessage.content
+            );
+            if (tempIndex !== -1) {
+              const updated = [...prev];
+              updated[tempIndex] = newMessage;
+              return updated;
+            }
             return [...prev, newMessage];
           });
           if (newMessage.role === "assistant") {
