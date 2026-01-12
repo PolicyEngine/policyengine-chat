@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
           api_base_url: API_BASE_URL,
           history: body.history,
           user_id: user?.id,
-          model: body.model || "claude-sonnet-4-5",
+          model: body.model || "claude-opus-4-5-20251101",
         }),
       }
     );

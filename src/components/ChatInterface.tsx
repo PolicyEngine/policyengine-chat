@@ -404,7 +404,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const [tokenCost, setTokenCost] = useState<number | null>(null);
-  const [model, setModel] = useState<"claude-sonnet-4-5" | "claude-opus-4-5-20251101">("claude-sonnet-4-5");
+  const [model, setModel] = useState<"claude-sonnet-4-5" | "claude-opus-4-5-20251101">("claude-opus-4-5-20251101");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();

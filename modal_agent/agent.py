@@ -455,6 +455,31 @@ def execute_api_tool(
         return f"Request error: {str(e)}"
 
 
+def summarize_api_result(client, raw_result: str, tool_name: str, tool_input: dict) -> str:
+    """Use Haiku to extract relevant information from large API responses."""
+    try:
+        response = client.messages.create(
+            model="claude-haiku-3-5-20241022",
+            max_tokens=1000,
+            messages=[{
+                "role": "user",
+                "content": f"""Extract the key information from this API response. Be concise but preserve important IDs, values, and data needed for policy analysis.
+
+Tool: {tool_name}
+Input: {json.dumps(tool_input)[:500]}
+
+Response:
+{raw_result[:15000]}
+
+Return only the essential information in a compact format."""
+            }]
+        )
+        return response.content[0].text
+    except Exception as e:
+        # Fall back to truncation if Haiku fails
+        return raw_result[:2000] + f"\n...[truncated, {len(raw_result)} total chars]"
+
+
 @app.function(image=image, secrets=[anthropic_secret, supabase_secret, logfire_secret], timeout=600)
 def run_agent(
     question: str,
@@ -463,7 +488,7 @@ def run_agent(
     history: list[dict] | None = None,
     max_turns: int = 30,
     user_id: str | None = None,
-    model: str = "claude-sonnet-4-5",
+    model: str = "claude-opus-4-5-20251101",
 ) -> dict:
     """Run agentic loop to answer a policy question.
 
@@ -604,11 +629,18 @@ def run_agent(
                     else:
                         tool = tool_lookup.get(block.name)
                         if tool:
-                            result = execute_api_tool(tool, block.input, api_base_url, log)
+                            raw_result = execute_api_tool(tool, block.input, api_base_url, log)
+                            # Use Haiku to summarize large API responses
+                            if len(raw_result) > 2000:
+                                log(f"[HAIKU] Summarizing {len(raw_result)} char response...")
+                                result = summarize_api_result(client, raw_result, block.name, block.input)
+                                log(f"[HAIKU] Compressed to {len(result)} chars")
+                            else:
+                                result = raw_result
                         else:
                             result = f"Unknown tool: {block.name}"
 
-                    log(f"[TOOL_RESULT] {result[:5000]}")
+                    log(f"[TOOL_RESULT] {result[:2000]}")
 
                     tool_results.append({
                         "type": "tool_result",
