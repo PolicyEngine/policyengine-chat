@@ -103,9 +103,7 @@ export function Sidebar() {
           {/* Header with PE branding */}
           <div className="p-5 border-b border-[var(--color-border)]">
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-9 h-9 rounded-lg bg-[var(--color-pe-green)] flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-sm">PE</span>
-              </div>
+              <img src="/logos/teal-square.svg" alt="PolicyEngine" className="w-9 h-9" />
               <div>
                 <div className="font-semibold text-[var(--color-text-primary)]">PolicyEngine</div>
                 <div className="text-xs text-[var(--color-text-muted)]">Policy analyst</div>
@@ -240,14 +238,14 @@ export function Sidebar() {
                 {user.is_anonymous ? (
                   <button
                     onClick={() => router.push("/login")}
-                    className="px-3 py-1.5 text-xs font-medium text-[var(--color-pe-green)] hover:bg-[var(--color-surface-sunken)] rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium text-[var(--color-pe-green)] hover:bg-[var(--color-surface-sunken)] rounded-lg transition-colors cursor-pointer"
                   >
                     Sign in
                   </button>
                 ) : (
                   <button
                     onClick={signOut}
-                    className="p-2 hover:bg-[var(--color-surface-sunken)] rounded-lg transition-colors"
+                    className="p-2 hover:bg-[var(--color-surface-sunken)] rounded-lg transition-colors cursor-pointer"
                     title="Sign out"
                   >
                     <svg className="w-4 h-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">

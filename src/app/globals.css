@@ -2,25 +2,25 @@
 @import "tailwindcss";
 
 @theme {
-  /* PolicyEngine brand colors */
-  --color-pe-green: #2c6e49;
-  --color-pe-green-light: #4c9a6d;
-  --color-pe-green-dark: #1a4a2e;
-  --color-pe-blue: #1a365d;
-  --color-pe-slate: #334155;
-  --color-pe-gray: #64748b;
+  /* PolicyEngine brand colors - matching policyengine-app-v2 design system */
+  --color-pe-green: #2C7A7B;  /* primary[600] - main UI color */
+  --color-pe-green-light: #319795;  /* primary[500] */
+  --color-pe-green-dark: #285E61;  /* primary[700] */
+  --color-pe-blue: #0284C7;  /* blue[600] */
+  --color-pe-slate: #344054;  /* gray[700] */
+  --color-pe-gray: #64748B;  /* secondary[500] */
 
   /* Neutral palette */
-  --color-surface: #fafbfc;
-  --color-surface-elevated: #ffffff;
-  --color-surface-sunken: #f1f5f9;
-  --color-border: #e2e8f0;
-  --color-border-strong: #cbd5e1;
+  --color-surface: #F5F9FF;  /* background.secondary */
+  --color-surface-elevated: #FFFFFF;
+  --color-surface-sunken: #F1F5F9;  /* background.tertiary */
+  --color-border: #E2E8F0;  /* border.light */
+  --color-border-strong: #CBD5E1;  /* border.medium */
 
   /* Text colors */
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
+  --color-text-primary: #000000;  /* text.primary */
+  --color-text-secondary: #5A5A5A;  /* text.secondary */
+  --color-text-muted: #9CA3AF;  /* text.tertiary */
 
   /* Code colors */
   --color-code-bg: #1e293b;
