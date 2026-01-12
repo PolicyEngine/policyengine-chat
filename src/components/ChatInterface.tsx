@@ -42,6 +42,15 @@ interface AgentLog {
   created_at: string;
 }
 
+interface Artifact {
+  id: string;
+  thread_id: string;
+  type: string;
+  title: string;
+  content: string;
+  created_at: string;
+}
+
 interface ParsedStep {
   type: "agent" | "tool_use" | "api_call" | "api_response" | "tool_result" | "assistant" | "unknown";
   title: string;
@@ -254,6 +263,57 @@ function ToolCard({ step }: { step: ParsedStep }) {
   return null;
 }
 
+function ArtifactCard({ artifact }: { artifact: Artifact }) {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const artifactUrl = `https://nikhilwoodruff--policyengine-chat-agent-serve-artifact.modal.run?id=${artifact.id}`;
+
+  return (
+    <div className="my-4 border border-[var(--color-border)] rounded-xl overflow-hidden bg-white shadow-sm">
+      <div
+        className="flex items-center justify-between px-4 py-2 bg-[var(--color-surface-sunken)] border-b border-[var(--color-border)] cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-[var(--color-pe-green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+          </svg>
+          <span className="text-sm font-medium text-[var(--color-text-primary)]">{artifact.title}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href={artifactUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="p-1.5 hover:bg-[var(--color-border)] rounded-md transition-colors"
+            title="Open in new tab"
+          >
+            <svg className="w-4 h-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+          <svg
+            className={`w-4 h-4 text-[var(--color-text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
+      {isExpanded && (
+        <iframe
+          src={artifactUrl}
+          className="w-full h-96 border-0"
+          sandbox="allow-scripts"
+          title={artifact.title}
+        />
+      )}
+    </div>
+  );
+}
+
 function CollapsedLogs({ logs }: { logs: AgentLog[] }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -325,6 +385,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [messageLogs, setMessageLogs] = useState<Record<string, AgentLog[]>>({});
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [isPublic, setIsPublic] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -336,6 +397,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
   useEffect(() => {
     loadMessages();
     loadThreadStatus();
+    loadArtifacts();
 
     const messagesChannel = supabase
       .channel(`messages-${threadId}`)
@@ -413,10 +475,32 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
       )
       .subscribe();
 
+    // Subscribe to artifacts
+    const artifactsChannel = supabase
+      .channel(`artifacts-${threadId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "artifacts",
+          filter: `thread_id=eq.${threadId}`,
+        },
+        (payload) => {
+          const newArtifact = payload.new as Artifact;
+          setArtifacts((prev) => {
+            if (prev.some((a) => a.id === newArtifact.id)) return prev;
+            return [...prev, newArtifact];
+          });
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(messagesChannel);
       supabase.removeChannel(logsChannel);
       supabase.removeChannel(threadChannel);
+      supabase.removeChannel(artifactsChannel);
     };
   }, [threadId]);
 
@@ -491,6 +575,15 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
         setTokenCost(cost);
       }
     }
+  }
+
+  async function loadArtifacts() {
+    const { data } = await supabase
+      .from("artifacts")
+      .select("*")
+      .eq("thread_id", threadId)
+      .order("created_at", { ascending: true });
+    if (data) setArtifacts(data);
   }
 
   async function togglePublic() {
@@ -730,6 +823,11 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                 </div>
               )}
             </div>
+          ))}
+
+          {/* Artifacts */}
+          {artifacts.map((artifact) => (
+            <ArtifactCard key={artifact.id} artifact={artifact} />
           ))}
 
           {/* Live agent logs */}

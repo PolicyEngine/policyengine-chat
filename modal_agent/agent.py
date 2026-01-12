@@ -172,6 +172,34 @@ GET_TOOL_HELP_TOOL = {
     },
 }
 
+CREATE_ARTIFACT_TOOL = {
+    "name": "create_artifact",
+    "description": """Create an interactive HTML/JS artifact to visualize data or results.
+Use this to create charts, tables, interactive calculators, or any visual content.
+The artifact will be rendered in a sandboxed iframe.
+
+Guidelines:
+- Use vanilla HTML/CSS/JS (no external dependencies except CDN links)
+- For charts, use Chart.js from CDN: <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+- Keep it self-contained in a single HTML document
+- Use modern CSS (flexbox, grid) for layout
+- Make it responsive""",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "title": {
+                "type": "string",
+                "description": "Short title for the artifact",
+            },
+            "content": {
+                "type": "string",
+                "description": "Complete HTML document including <html>, <head>, <body> tags",
+            },
+        },
+        "required": ["title", "content"],
+    },
+}
+
 
 def fetch_openapi_spec(api_base_url: str) -> dict:
     """Fetch and cache OpenAPI spec."""
@@ -501,7 +529,7 @@ def run_agent(
 
     # Create minimal stubs for Claude (reduces token cost)
     minimal_stubs = create_minimal_tool_stubs(full_tools)
-    claude_tools = minimal_stubs + [SLEEP_TOOL, GET_TOOL_HELP_TOOL]
+    claude_tools = minimal_stubs + [SLEEP_TOOL, GET_TOOL_HELP_TOOL, CREATE_ARTIFACT_TOOL]
 
     client = anthropic.Anthropic()
     logfire.instrument_anthropic(client)
@@ -565,6 +593,24 @@ def run_agent(
                         tool_name = block.input.get("tool_name", "")
                         log(f"[TOOL_HELP] Fetching docs for: {tool_name}")
                         result = get_tool_help_response(tool_name, full_tools)
+                    elif block.name == "create_artifact":
+                        title = block.input.get("title", "Untitled")
+                        content = block.input.get("content", "")
+                        log(f"[ARTIFACT] Creating: {title}")
+                        try:
+                            artifact_data = supabase.table("artifacts").insert({
+                                "thread_id": thread_id,
+                                "type": "html",
+                                "title": title,
+                                "content": content,
+                            }).execute()
+                            artifact_id = artifact_data.data[0]["id"]
+                            artifact_url = f"https://nikhilwoodruff--policyengine-chat-agent-serve-artifact.modal.run?id={artifact_id}"
+                            result = f"Artifact created: {title}\nID: {artifact_id}\nURL: {artifact_url}"
+                            log(f"[ARTIFACT] Created with ID: {artifact_id}")
+                        except Exception as e:
+                            result = f"Failed to create artifact: {str(e)}"
+                            log(f"[ARTIFACT] Error: {str(e)}")
                     else:
                         tool = tool_lookup.get(block.name)
                         if tool:
@@ -666,6 +712,46 @@ def run_agent_web(request: AgentRequest) -> dict:
         history=request.history,
         user_id=request.user_id,
     )
+
+
+@app.function(image=image, secrets=[supabase_secret], timeout=30)
+@modal.web_endpoint(method="GET")
+def serve_artifact(id: str) -> modal.web_endpoint.Response:
+    """Serve an artifact's HTML content in a sandboxed context."""
+    import os
+    from supabase import create_client
+
+    supabase_url = os.environ["SUPABASE_URL"]
+    supabase_key = os.environ["SUPABASE_SERVICE_KEY"]
+    supabase = create_client(supabase_url, supabase_key)
+
+    try:
+        result = supabase.table("artifacts").select("content, title").eq("id", id).single().execute()
+        if not result.data:
+            return modal.web_endpoint.Response(
+                content="Artifact not found",
+                status_code=404,
+                media_type="text/plain",
+            )
+
+        content = result.data["content"]
+
+        # Return HTML with restrictive CSP headers
+        return modal.web_endpoint.Response(
+            content=content,
+            status_code=200,
+            media_type="text/html",
+            headers={
+                "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src * data:; connect-src *;",
+                "X-Frame-Options": "ALLOWALL",
+            },
+        )
+    except Exception as e:
+        return modal.web_endpoint.Response(
+            content=f"Error: {str(e)}",
+            status_code=500,
+            media_type="text/plain",
+        )
 
 
 if __name__ == "__main__":
