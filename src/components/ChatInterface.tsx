@@ -265,6 +265,7 @@ function ToolCard({ step }: { step: ParsedStep }) {
 
 function ArtifactCard({ artifact }: { artifact: Artifact }) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const artifactUrl = `https://nikhilwoodruff--policyengine-chat-agent-serve-artifact.modal.run?id=${artifact.id}`;
 
   return (
@@ -278,6 +279,9 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
           </svg>
           <span className="text-sm font-medium text-[var(--color-text-primary)]">{artifact.title}</span>
+          {isLoading && isExpanded && (
+            <span className="text-xs text-[var(--color-text-muted)]">Building...</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <a
@@ -303,12 +307,22 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
         </div>
       </div>
       {isExpanded && (
-        <iframe
-          src={artifactUrl}
-          className="w-full h-96 border-0"
-          sandbox="allow-scripts"
-          title={artifact.title}
-        />
+        <div className="relative">
+          {isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--color-surface-sunken)] h-96">
+              <div className="w-8 h-8 border-2 border-[var(--color-pe-green)] border-t-transparent rounded-full animate-spin mb-3" />
+              <span className="text-sm text-[var(--color-text-muted)]">Building artifact...</span>
+              <span className="text-xs text-[var(--color-text-muted)] mt-1">This may take a moment on first load</span>
+            </div>
+          )}
+          <iframe
+            src={artifactUrl}
+            className={`w-full h-96 border-0 ${isLoading ? "invisible" : ""}`}
+            sandbox="allow-scripts"
+            title={artifact.title}
+            onLoad={() => setIsLoading(false)}
+          />
+        </div>
       )}
     </div>
   );
@@ -390,6 +404,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [copied, setCopied] = useState(false);
   const [tokenCost, setTokenCost] = useState<number | null>(null);
+  const [model, setModel] = useState<"claude-sonnet-4-5" | "claude-opus-4-5-20251101">("claude-sonnet-4-5");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
@@ -637,6 +652,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
           question: userMessage,
           history,
           threadId,
+          model,
         }),
       });
 
@@ -686,7 +702,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer"
                 title="Copy entire conversation"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -699,7 +715,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
             <div className="relative">
               <button
                 onClick={() => setShowShareMenu(!showShareMenu)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -712,7 +728,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                     <span className="text-sm font-medium text-[var(--color-text-primary)]">Public link</span>
                     <button
                       onClick={togglePublic}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isPublic ? "bg-[var(--color-pe-green)]" : "bg-gray-200"}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${isPublic ? "bg-[var(--color-pe-green)]" : "bg-gray-200"}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
                     </button>
@@ -720,7 +736,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                   {isPublic && (
                     <button
                       onClick={copyShareLink}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[var(--color-surface-sunken)] hover:bg-[var(--color-border)] rounded-lg text-sm text-[var(--color-text-secondary)] transition-colors"
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[var(--color-surface-sunken)] hover:bg-[var(--color-border)] rounded-lg text-sm text-[var(--color-text-secondary)] transition-colors cursor-pointer"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -734,6 +750,15 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                 </div>
               )}
             </div>
+            {/* Model selector */}
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value as typeof model)}
+              className="px-2 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors cursor-pointer border-none outline-none"
+            >
+              <option value="claude-sonnet-4-5" className="text-gray-900">Sonnet 4.5</option>
+              <option value="claude-opus-4-5-20251101" className="text-gray-900">Opus 4.5</option>
+            </select>
             {/* Token cost */}
             {tokenCost !== null && tokenCost > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 rounded-lg">
@@ -874,7 +899,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="px-5 py-3 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-xl text-[14px] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 shadow-sm"
+            className="px-5 py-3 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-xl text-[14px] font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
           >
             {isLoading ? (
               <>
