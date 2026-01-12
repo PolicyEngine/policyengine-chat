@@ -1,11 +1,39 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Message } from "@/types/database";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
+
+function CopyButton({ text, className = "" }: { text: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [text]);
+
+  return (
+    <button
+      onClick={handleCopy}
+      className={`p-1.5 rounded-md hover:bg-[var(--color-surface-sunken)] transition-colors cursor-pointer ${className}`}
+      title="Copy"
+    >
+      {copied ? (
+        <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="w-4 h-4 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+      )}
+    </button>
+  );
+}
 
 interface AgentLog {
   id: string;
@@ -141,7 +169,7 @@ function ToolCard({ step }: { step: ParsedStep }) {
       <div className="py-1.5 animate-fadeIn">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-2 hover:text-[var(--color-pe-green)] transition-colors group w-full text-left font-mono"
+          className="flex items-center gap-2 hover:text-[var(--color-pe-green)] transition-colors group w-full text-left font-mono cursor-pointer"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-pe-green)] shrink-0" />
           <span className="text-[12px] text-[var(--color-text-secondary)]">{step.title}</span>
@@ -199,7 +227,7 @@ function ToolCard({ step }: { step: ParsedStep }) {
       <div className="py-1 ml-3.5 animate-fadeIn">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] font-mono"
+          className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] font-mono cursor-pointer"
         >
           <svg className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -243,7 +271,7 @@ function CollapsedLogs({ logs }: { logs: AgentLog[] }) {
     <div className="mb-2">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] font-mono"
+        className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] font-mono cursor-pointer"
       >
         <svg
           className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-90" : ""}`}
@@ -508,20 +536,34 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--color-border)] bg-gradient-to-r from-[var(--color-pe-green)] to-[var(--color-pe-green-dark)]">
+      <div className="px-6 py-3 bg-gradient-to-r from-[var(--color-pe-green)] to-[var(--color-pe-green-dark)] shadow-md">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
+            <img src="/logos/white-square.svg" alt="PolicyEngine" className="w-8 h-8" />
             <div>
-              <h2 className="text-white font-semibold">Policy analyst</h2>
-              <p className="text-white/70 text-xs">Ask questions about UK and US tax-benefit policy</p>
+              <h2 className="text-white font-semibold text-sm">Policy analyst</h2>
+              <p className="text-white/70 text-xs">UK and US tax-benefit policy</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Copy thread button */}
+            {messages.length > 0 && (
+              <button
+                onClick={() => {
+                  const text = messages.map(m => `${m.role === "user" ? "User" : "PolicyEngine"}: ${m.content}`).join("\n\n");
+                  navigator.clipboard.writeText(text);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs font-medium transition-colors"
+                title="Copy entire conversation"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                {copied ? "Copied!" : "Copy all"}
+              </button>
+            )}
             {/* Share button */}
             <div className="relative">
               <button
@@ -549,21 +591,10 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                       onClick={copyShareLink}
                       className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-[var(--color-surface-sunken)] hover:bg-[var(--color-border)] rounded-lg text-sm text-[var(--color-text-secondary)] transition-colors"
                     >
-                      {copied ? (
-                        <>
-                          <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          Copy link
-                        </>
-                      )}
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      Copy link
                     </button>
                   )}
                   <p className="mt-2 text-xs text-[var(--color-text-muted)]">
@@ -573,9 +604,9 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
               )}
             </div>
             {/* Status indicator */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/20 rounded-lg">
               <div className={`w-2 h-2 rounded-full ${isLoading ? "bg-amber-300 animate-pulse-dot" : "bg-green-300"}`} />
-              <span className="text-white/70 text-xs font-medium">
+              <span className="text-white/80 text-xs font-medium">
                 {isLoading ? "Working..." : "Ready"}
               </span>
             </div>
@@ -605,7 +636,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
                 <button
                   key={i}
                   onClick={() => setInput(q)}
-                  className="text-left px-4 py-3 rounded-xl bg-[var(--color-surface-sunken)] hover:bg-white border border-transparent hover:border-[var(--color-border)] hover:shadow-sm text-[13px] text-[var(--color-text-secondary)] transition-all group"
+                  className="text-left px-4 py-3 rounded-xl bg-[var(--color-surface-sunken)] hover:bg-white border border-transparent hover:border-[var(--color-border)] hover:shadow-sm text-[13px] text-[var(--color-text-secondary)] transition-all group cursor-pointer"
                 >
                   <span className="group-hover:text-[var(--color-pe-green)] transition-colors">{q}</span>
                 </button>
@@ -616,24 +647,30 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
 
         <div className="space-y-6 max-w-3xl mx-auto">
           {messages.map((message) => (
-            <div key={message.id}>
+            <div key={message.id} className="group/message">
               {message.role === "user" ? (
-                <div className="flex justify-end">
+                <div className="flex justify-end items-start gap-2">
+                  <CopyButton
+                    text={message.content}
+                    className="opacity-0 group-hover/message:opacity-100 mt-2"
+                  />
                   <div className="max-w-[80%] bg-[var(--color-pe-green)] text-white rounded-2xl rounded-br-md px-5 py-3 shadow-sm">
                     <p className="text-[14px] leading-relaxed">{message.content}</p>
                   </div>
                 </div>
               ) : (
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[var(--color-pe-green)] flex items-center justify-center flex-shrink-0 shadow-sm">
-                    <span className="text-white text-xs font-bold">PE</span>
-                  </div>
+                  <img src="/logos/teal-square.svg" alt="PolicyEngine" className="w-8 h-8 flex-shrink-0" />
                   <div className="flex-1">
                     {/* Collapsed logs for this message */}
                     {messageLogs[message.id] && messageLogs[message.id].length > 0 && (
                       <CollapsedLogs logs={messageLogs[message.id]} />
                     )}
-                    <div className="bg-white border border-[var(--color-border)] rounded-2xl rounded-tl-md px-5 py-4 shadow-sm">
+                    <div className="bg-white border border-[var(--color-border)] rounded-2xl rounded-tl-md px-5 py-4 shadow-sm relative">
+                      <CopyButton
+                        text={message.content}
+                        className="absolute top-2 right-2 opacity-0 group-hover/message:opacity-100"
+                      />
                       <div className="response-content">
                         <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                           {message.content}
@@ -649,9 +686,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
           {/* Live agent logs */}
           {isLoading && logs.length > 0 && (
             <div className="flex gap-3 animate-fadeIn">
-              <div className="w-8 h-8 rounded-lg bg-[var(--color-pe-green)] flex items-center justify-center flex-shrink-0 shadow-sm">
-                <span className="text-white text-xs font-bold">PE</span>
-              </div>
+              <img src="/logos/teal-square.svg" alt="PolicyEngine" className="w-8 h-8 flex-shrink-0" />
               <div className="flex-1 bg-[var(--color-surface-sunken)] rounded-2xl rounded-tl-md p-4 max-h-[500px] overflow-y-auto border border-[var(--color-border)]">
                 <ProgressIndicator logs={logs} />
                 <div className="space-y-0">
@@ -666,9 +701,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
 
           {isLoading && logs.length === 0 && (
             <div className="flex gap-3 animate-fadeIn">
-              <div className="w-8 h-8 rounded-lg bg-[var(--color-pe-green)] flex items-center justify-center flex-shrink-0 shadow-sm">
-                <span className="text-white text-xs font-bold">PE</span>
-              </div>
+              <img src="/logos/teal-square.svg" alt="PolicyEngine" className="w-8 h-8 flex-shrink-0" />
               <div className="flex items-center gap-3 px-5 py-4 bg-[var(--color-surface-sunken)] rounded-2xl rounded-tl-md border border-[var(--color-border)]">
                 <div className="w-4 h-4 border-2 border-[var(--color-pe-green)] border-t-transparent rounded-full animate-spin" />
                 <span className="text-[13px] font-mono text-[var(--color-text-muted)]">Starting agent...</span>
