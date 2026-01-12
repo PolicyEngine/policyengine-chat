@@ -190,7 +190,7 @@ const svg = d3.select("#chart").append("svg")
         "properties": {
             "title": {
                 "type": "string",
-                "description": "Short title for the artifact",
+                "description": "Short title in sentence case (e.g. 'Income distribution by decile')",
             },
             "type": {
                 "type": "string",
