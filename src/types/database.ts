@@ -3,6 +3,8 @@ export interface Thread {
   title: string;
   user_id: string | null;
   is_public: boolean;
+  input_tokens: number | null;
+  output_tokens: number | null;
   created_at: string;
   updated_at: string;
 }
