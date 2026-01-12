@@ -414,6 +414,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
     loadMessages();
     loadThreadStatus();
     loadArtifacts();
+    loadLogs();
 
     const messagesChannel = supabase
       .channel(`messages-${threadId}`)
@@ -610,6 +611,29 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
       .eq("thread_id", threadId)
       .order("created_at", { ascending: true });
     if (data) setArtifacts(data);
+  }
+
+  async function loadLogs() {
+    // Load existing logs (in case of page refresh while agent is running)
+    const { data: existingLogs } = await supabase
+      .from("agent_logs")
+      .select("*")
+      .eq("thread_id", threadId)
+      .order("created_at", { ascending: true });
+
+    if (existingLogs && existingLogs.length > 0) {
+      // Check if agent is still running (logs exist but no completion marker)
+      const hasCompleted = existingLogs.some((log) =>
+        log.message.includes("[AGENT] Completed")
+      );
+
+      if (!hasCompleted) {
+        // Agent is still running - show logs and set loading state
+        setLogs(existingLogs);
+        setIsLoading(true);
+      }
+      // If completed, logs will be attached to the message via tool_logs
+    }
   }
 
   async function togglePublic() {
