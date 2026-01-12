@@ -265,6 +265,7 @@ function ToolCard({ step }: { step: ParsedStep }) {
 
 function ArtifactCard({ artifact }: { artifact: Artifact }) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const artifactUrl = `https://nikhilwoodruff--policyengine-chat-agent-serve-artifact.modal.run?id=${artifact.id}`;
 
   return (
@@ -278,6 +279,9 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
           </svg>
           <span className="text-sm font-medium text-[var(--color-text-primary)]">{artifact.title}</span>
+          {isLoading && isExpanded && (
+            <span className="text-xs text-[var(--color-text-muted)]">Building...</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <a
@@ -303,12 +307,22 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
         </div>
       </div>
       {isExpanded && (
-        <iframe
-          src={artifactUrl}
-          className="w-full h-96 border-0"
-          sandbox="allow-scripts"
-          title={artifact.title}
-        />
+        <div className="relative">
+          {isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--color-surface-sunken)] h-96">
+              <div className="w-8 h-8 border-2 border-[var(--color-pe-green)] border-t-transparent rounded-full animate-spin mb-3" />
+              <span className="text-sm text-[var(--color-text-muted)]">Building artifact...</span>
+              <span className="text-xs text-[var(--color-text-muted)] mt-1">This may take a moment on first load</span>
+            </div>
+          )}
+          <iframe
+            src={artifactUrl}
+            className={`w-full h-96 border-0 ${isLoading ? "invisible" : ""}`}
+            sandbox="allow-scripts"
+            title={artifact.title}
+            onLoad={() => setIsLoading(false)}
+          />
+        </div>
       )}
     </div>
   );

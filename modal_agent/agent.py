@@ -18,6 +18,15 @@ image = modal.Image.debian_slim(python_version="3.12").pip_install(
     "anthropic", "requests", "supabase", "fastapi", "logfire"
 )
 
+# Image with bun for artifact building
+artifact_image = (
+    modal.Image.debian_slim(python_version="3.12")
+    .apt_install("curl", "unzip")
+    .run_commands("curl -fsSL https://bun.sh/install | bash")
+    .env({"PATH": "/root/.bun/bin:$PATH"})
+    .pip_install("supabase", "fastapi")
+)
+
 app = modal.App("policyengine-chat-agent")
 anthropic_secret = modal.Secret.from_name("anthropic-api-key")
 supabase_secret = modal.Secret.from_name("policyengine-chat-supabase")
@@ -174,16 +183,16 @@ GET_TOOL_HELP_TOOL = {
 
 CREATE_ARTIFACT_TOOL = {
     "name": "create_artifact",
-    "description": """Create an interactive HTML/JS artifact to visualize data or results.
-Use this to create charts, tables, interactive calculators, or any visual content.
-The artifact will be rendered in a sandboxed iframe.
+    "description": """Create an interactive artifact to visualize data or results.
+Supports static HTML or full JS/TS apps with npm dependencies (built with bun).
 
-Guidelines:
-- Use vanilla HTML/CSS/JS (no external dependencies except CDN links)
-- For charts, use Chart.js from CDN: <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-- Keep it self-contained in a single HTML document
-- Use modern CSS (flexbox, grid) for layout
-- Make it responsive""",
+Types:
+- "html": Static HTML/CSS/JS (use CDN links for libraries). Content is a complete HTML document.
+- "react": React app. Content is the main App.tsx/App.jsx code. Dependencies auto-include react/react-dom.
+- "script": Node.js script that outputs HTML. Content is JS/TS code. Output goes to stdout.
+
+For "html" type, use CDN links like Chart.js: <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+For "react"/"script", specify npm packages in dependencies array.""",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -191,12 +200,22 @@ Guidelines:
                 "type": "string",
                 "description": "Short title for the artifact",
             },
+            "type": {
+                "type": "string",
+                "enum": ["html", "react", "script"],
+                "description": "Artifact type: html (static), react (React app), script (Node outputs HTML)",
+            },
             "content": {
                 "type": "string",
-                "description": "Complete HTML document including <html>, <head>, <body> tags",
+                "description": "For html: complete HTML doc. For react: App component code. For script: JS/TS code.",
+            },
+            "dependencies": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "npm packages to install (e.g. ['chart.js', 'lodash']). Not needed for html type.",
             },
         },
-        "required": ["title", "content"],
+        "required": ["title", "type", "content"],
     },
 }
 
@@ -595,14 +614,17 @@ def run_agent(
                         result = get_tool_help_response(tool_name, full_tools)
                     elif block.name == "create_artifact":
                         title = block.input.get("title", "Untitled")
+                        artifact_type = block.input.get("type", "html")
                         content = block.input.get("content", "")
-                        log(f"[ARTIFACT] Creating: {title}")
+                        dependencies = block.input.get("dependencies", [])
+                        log(f"[ARTIFACT] Creating: {title} (type: {artifact_type})")
                         try:
                             artifact_data = supabase.table("artifacts").insert({
                                 "thread_id": thread_id,
-                                "type": "html",
+                                "type": artifact_type,
                                 "title": title,
                                 "content": content,
+                                "dependencies": dependencies,
                             }).execute()
                             artifact_id = artifact_data.data[0]["id"]
                             artifact_url = f"https://nikhilwoodruff--policyengine-chat-agent-serve-artifact.modal.run?id={artifact_id}"
@@ -714,11 +736,13 @@ def run_agent_web(request: AgentRequest) -> dict:
     )
 
 
-@app.function(image=image, secrets=[supabase_secret], timeout=30)
+@app.function(image=artifact_image, secrets=[supabase_secret], timeout=120)
 @modal.web_endpoint(method="GET")
 def serve_artifact(id: str):
-    """Serve an artifact's HTML content in a sandboxed context."""
+    """Serve an artifact's content, building with bun if needed."""
     import os
+    import subprocess
+    import tempfile
     from fastapi.responses import HTMLResponse, PlainTextResponse
     from supabase import create_client
 
@@ -726,21 +750,100 @@ def serve_artifact(id: str):
     supabase_key = os.environ["SUPABASE_SERVICE_KEY"]
     supabase = create_client(supabase_url, supabase_key)
 
+    csp_headers = {
+        "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; img-src * data:; connect-src *;",
+        "X-Frame-Options": "ALLOWALL",
+    }
+
     try:
-        result = supabase.table("artifacts").select("content, title").eq("id", id).single().execute()
+        result = supabase.table("artifacts").select("content, title, type, dependencies").eq("id", id).single().execute()
         if not result.data:
             return PlainTextResponse("Artifact not found", status_code=404)
 
         content = result.data["content"]
+        artifact_type = result.data.get("type", "html")
+        dependencies = result.data.get("dependencies") or []
 
-        # Return HTML with restrictive CSP headers
-        return HTMLResponse(
-            content=content,
-            headers={
-                "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src * data:; connect-src *;",
-                "X-Frame-Options": "ALLOWALL",
-            },
-        )
+        # Static HTML - serve directly
+        if artifact_type == "html":
+            return HTMLResponse(content=content, headers=csp_headers)
+
+        # React or script - build with bun
+        with tempfile.TemporaryDirectory() as tmpdir:
+            if artifact_type == "react":
+                # Create package.json
+                pkg = {
+                    "name": "artifact",
+                    "type": "module",
+                    "dependencies": {
+                        "react": "^18",
+                        "react-dom": "^18",
+                        **{dep: "*" for dep in dependencies}
+                    }
+                }
+                with open(f"{tmpdir}/package.json", "w") as f:
+                    import json
+                    json.dump(pkg, f)
+
+                # Write App component
+                with open(f"{tmpdir}/App.tsx", "w") as f:
+                    f.write(content)
+
+                # Create entry point
+                entry = '''
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+createRoot(document.getElementById("root")!).render(<App />);
+'''
+                with open(f"{tmpdir}/index.tsx", "w") as f:
+                    f.write(entry)
+
+                # Install deps and build
+                subprocess.run(["bun", "install"], cwd=tmpdir, check=True, capture_output=True)
+                result = subprocess.run(
+                    ["bun", "build", "index.tsx", "--outfile=bundle.js"],
+                    cwd=tmpdir, capture_output=True, text=True
+                )
+                if result.returncode != 0:
+                    return PlainTextResponse(f"Build error: {result.stderr}", status_code=500)
+
+                with open(f"{tmpdir}/bundle.js") as f:
+                    bundle = f.read()
+
+                html = f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>*{{margin:0;padding:0;box-sizing:border-box}}body{{font-family:system-ui,sans-serif}}</style>
+</head><body><div id="root"></div><script>{bundle}</script></body></html>'''
+                return HTMLResponse(content=html, headers=csp_headers)
+
+            elif artifact_type == "script":
+                # Create package.json if deps
+                if dependencies:
+                    pkg = {"name": "artifact", "type": "module", "dependencies": {dep: "*" for dep in dependencies}}
+                    with open(f"{tmpdir}/package.json", "w") as f:
+                        import json
+                        json.dump(pkg, f)
+                    subprocess.run(["bun", "install"], cwd=tmpdir, check=True, capture_output=True)
+
+                # Write and run script
+                ext = ".ts" if "typescript" in str(dependencies).lower() else ".js"
+                with open(f"{tmpdir}/script{ext}", "w") as f:
+                    f.write(content)
+
+                result = subprocess.run(
+                    ["bun", f"script{ext}"],
+                    cwd=tmpdir, capture_output=True, text=True, timeout=30
+                )
+                if result.returncode != 0:
+                    return PlainTextResponse(f"Script error: {result.stderr}", status_code=500)
+
+                # Script output is the HTML
+                return HTMLResponse(content=result.stdout, headers=csp_headers)
+
+        return PlainTextResponse(f"Unknown artifact type: {artifact_type}", status_code=400)
+    except subprocess.TimeoutExpired:
+        return PlainTextResponse("Script timed out", status_code=500)
     except Exception as e:
         return PlainTextResponse(f"Error: {str(e)}", status_code=500)
 
