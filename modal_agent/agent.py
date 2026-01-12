@@ -682,7 +682,7 @@ def serve_artifact(id: str):
     supabase = create_client(supabase_url, supabase_key)
 
     csp_headers = {
-        "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; img-src * data:; connect-src *;",
+        "Content-Security-Policy": "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;",
         "X-Frame-Options": "ALLOWALL",
     }
 
