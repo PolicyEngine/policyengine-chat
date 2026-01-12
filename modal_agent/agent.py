@@ -222,6 +222,26 @@ def schema_to_json_schema(spec: dict, schema: dict) -> dict:
     return result
 
 
+def compact_schema(schema: dict) -> dict:
+    """Remove verbose descriptions from nested schemas to reduce tokens."""
+    if not isinstance(schema, dict):
+        return schema
+    result = {}
+    for key, value in schema.items():
+        if key == "description":
+            # Keep only first sentence, max 80 chars
+            desc = value.split(".")[0][:80]
+            if desc:
+                result[key] = desc
+        elif key == "properties":
+            result[key] = {k: compact_schema(v) for k, v in value.items()}
+        elif key == "items":
+            result[key] = compact_schema(value)
+        else:
+            result[key] = value
+    return result
+
+
 def openapi_to_claude_tools(spec: dict) -> list[dict]:
     """Convert OpenAPI spec to Claude tool definitions."""
     tools = []
@@ -235,28 +255,25 @@ def openapi_to_claude_tools(spec: dict) -> list[dict]:
             tool_name = re.sub(r"[^a-zA-Z0-9_]", "_", op_id)
             tool_name = re.sub(r"_+", "_", tool_name).strip("_")
 
+            # Concise description: just method + path + summary
             summary = operation.get("summary", "")
-            description = operation.get("description", "")
             full_desc = f"{method.upper()} {path}"
             if summary:
-                full_desc += f"\n\n{summary}"
-            if description:
-                full_desc += f"\n\n{description}"
+                full_desc += f" - {summary}"
 
             properties = {}
             required = []
 
             for param in operation.get("parameters", []):
                 param_name = param.get("name")
-                param_in = param.get("in")
                 param_schema = param.get("schema", {})
                 param_required = param.get("required", False)
 
                 prop = schema_to_json_schema(spec, param_schema)
-                prop["description"] = (
-                    param.get("description", "")
-                    + f" (in: {param_in})"
-                )
+                # Concise param description (no "in: query" suffix)
+                param_desc = param.get("description", "")
+                if param_desc:
+                    prop["description"] = param_desc.split(".")[0][:80]
                 properties[param_name] = prop
 
                 if param_required:
@@ -270,6 +287,7 @@ def openapi_to_claude_tools(spec: dict) -> list[dict]:
 
                 if body_schema:
                     resolved = schema_to_json_schema(spec, body_schema)
+                    resolved = compact_schema(resolved)
                     if "properties" in resolved:
                         for prop_name, prop_schema in resolved["properties"].items():
                             properties[prop_name] = prop_schema
@@ -286,7 +304,7 @@ def openapi_to_claude_tools(spec: dict) -> list[dict]:
 
             tools.append({
                 "name": tool_name,
-                "description": full_desc[:1024],
+                "description": full_desc[:256],  # Shorter max length
                 "input_schema": input_schema,
                 "_meta": {
                     "path": path,
