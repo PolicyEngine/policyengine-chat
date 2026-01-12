@@ -118,9 +118,19 @@ Lead with key numbers, then provide detail:
 | National Insurance | -£2,994 |
 | **Net income** | **£39,520** |
 
+## CRITICAL: Never hallucinate IDs or values
+
+**NEVER make up or guess IDs.** You must ALWAYS call the API to get real IDs:
+- Before using a simulation_id, call GET /simulations/ to list them
+- Before using a policy_id, call GET /policies/ or create one with POST /policies/
+- Before using a dataset_id, call GET /datasets/ to find it
+- Before using a parameter_id, call GET /parameters/ to search for it
+
+If you don't have an ID, you MUST call the relevant list/search endpoint first. Making up UUIDs will cause errors and waste the user's time.
+
 ## Guidelines
 
-1. Use the API tools to get accurate, current data
+1. Use the API tools to get accurate, current data - NEVER guess or make up values
 2. Be concise - lead with key numbers
 3. For UK, amounts are in GBP (£). For US, amounts are in USD ($)
 4. When polling async endpoints, use the sleep tool to wait 5-10 seconds between requests
@@ -433,6 +443,8 @@ def run_agent(
 
     final_response = None
     turns = 0
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     with logfire.span("agent_conversation", thread_id=thread_id, user_id=user_id or "anonymous"):
         while turns < max_turns:
@@ -446,6 +458,10 @@ def run_agent(
                 tools=claude_tools,
                 messages=messages,
             )
+
+            # Track token usage
+            total_input_tokens += response.usage.input_tokens
+            total_output_tokens += response.usage.output_tokens
 
             log(f"[AGENT] Stop reason: {response.stop_reason}")
 
@@ -488,7 +504,26 @@ def run_agent(
             else:
                 break
 
-    log(f"[AGENT] Completed in {turns} turns")
+    log(f"[AGENT] Completed in {turns} turns, {total_input_tokens} input tokens, {total_output_tokens} output tokens")
+
+    # Calculate cost (Claude Sonnet pricing: $3/1M input, $15/1M output)
+    input_cost = (total_input_tokens / 1_000_000) * 3
+    output_cost = (total_output_tokens / 1_000_000) * 15
+    total_cost = input_cost + output_cost
+
+    # Update thread with token usage
+    try:
+        # Get current token counts
+        thread_data = supabase.table("threads").select("input_tokens, output_tokens").eq("id", thread_id).single().execute()
+        current_input = thread_data.data.get("input_tokens") or 0
+        current_output = thread_data.data.get("output_tokens") or 0
+
+        supabase.table("threads").update({
+            "input_tokens": current_input + total_input_tokens,
+            "output_tokens": current_output + total_output_tokens,
+        }).eq("id", thread_id).execute()
+    except Exception as e:
+        print(f"Failed to update token counts: {e}")
 
     # Save the assistant message to Supabase
     if final_response:
@@ -509,7 +544,7 @@ def run_agent(
                 messages=[
                     {"role": "user", "content": question},
                     {"role": "assistant", "content": final_response},
-                    {"role": "user", "content": "Generate a short title (max 6 words) for this conversation. Reply with just the title, no quotes or punctuation."},
+                    {"role": "user", "content": "Generate a short title (max 6 words) for this conversation in sentence case (only capitalise first word and proper nouns). Reply with just the title, no quotes or punctuation."},
                 ],
             )
             title = title_response.content[0].text.strip()[:60]
