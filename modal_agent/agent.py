@@ -716,9 +716,10 @@ def run_agent_web(request: AgentRequest) -> dict:
 
 @app.function(image=image, secrets=[supabase_secret], timeout=30)
 @modal.web_endpoint(method="GET")
-def serve_artifact(id: str) -> modal.web_endpoint.Response:
+def serve_artifact(id: str):
     """Serve an artifact's HTML content in a sandboxed context."""
     import os
+    from fastapi.responses import HTMLResponse, PlainTextResponse
     from supabase import create_client
 
     supabase_url = os.environ["SUPABASE_URL"]
@@ -728,30 +729,20 @@ def serve_artifact(id: str) -> modal.web_endpoint.Response:
     try:
         result = supabase.table("artifacts").select("content, title").eq("id", id).single().execute()
         if not result.data:
-            return modal.web_endpoint.Response(
-                content="Artifact not found",
-                status_code=404,
-                media_type="text/plain",
-            )
+            return PlainTextResponse("Artifact not found", status_code=404)
 
         content = result.data["content"]
 
         # Return HTML with restrictive CSP headers
-        return modal.web_endpoint.Response(
+        return HTMLResponse(
             content=content,
-            status_code=200,
-            media_type="text/html",
             headers={
                 "Content-Security-Policy": "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src * data:; connect-src *;",
                 "X-Frame-Options": "ALLOWALL",
             },
         )
     except Exception as e:
-        return modal.web_endpoint.Response(
-            content=f"Error: {str(e)}",
-            status_code=500,
-            media_type="text/plain",
-        )
+        return PlainTextResponse(f"Error: {str(e)}", status_code=500)
 
 
 if __name__ == "__main__":
