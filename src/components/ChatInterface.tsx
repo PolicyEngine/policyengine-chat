@@ -363,6 +363,8 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
               return [];
             });
             setIsLoading(false);
+            // Reload thread status to get updated token counts
+            loadThreadStatus();
           }
         }
       )
@@ -447,6 +449,8 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
             });
           }
           setIsLoading(false);
+          // Reload thread status to get updated token counts
+          loadThreadStatus();
         }
       }
     }, 2000);
@@ -789,6 +793,9 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
             )}
           </button>
         </form>
+        <p className="text-center text-[11px] text-[var(--color-text-muted)] mt-2 max-w-3xl mx-auto">
+          Messages are processed by PolicyEngine and stored on our servers. Do not share sensitive personal information.
+        </p>
       </div>
     </div>
   );

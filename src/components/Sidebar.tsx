@@ -1,18 +1,65 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "./AuthProvider";
 import type { Thread } from "@/types/database";
 
+const MIN_WIDTH = 200;
+const MAX_WIDTH = 400;
+const DEFAULT_WIDTH = 288; // 18rem = 288px
+
 export function Sidebar() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [isOpen, setIsOpen] = useState(true);
+  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [isDragging, setIsDragging] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoading } = useAuth();
   const supabase = createClient();
+
+  // Load saved width from localStorage
+  useEffect(() => {
+    const savedWidth = localStorage.getItem("sidebar-width");
+    if (savedWidth) {
+      const parsed = parseInt(savedWidth, 10);
+      if (parsed >= MIN_WIDTH && parsed <= MAX_WIDTH) {
+        setWidth(parsed);
+      }
+    }
+  }, []);
+
+  // Handle drag
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
+      setWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      localStorage.setItem("sidebar-width", width.toString());
+      window.dispatchEvent(new Event("sidebar-resize"));
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, width]);
 
   const currentThreadId = pathname?.startsWith("/chat/")
     ? pathname.split("/")[2]
@@ -92,10 +139,12 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside
+        ref={sidebarRef}
+        style={{ width: `${width}px` }}
         className={`
-          fixed z-40 h-full w-72 flex-shrink-0
+          fixed z-40 h-full flex-shrink-0
           bg-white border-r border-[var(--color-border)]
-          transition-transform duration-200
+          ${isDragging ? "" : "transition-transform duration-200"}
           ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
       >
@@ -268,6 +317,15 @@ export function Sidebar() {
             </a>
           </div>
         </div>
+        {/* Drag handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          className={`
+            absolute top-0 right-0 w-1 h-full cursor-ew-resize
+            hover:bg-[var(--color-pe-green)]/30 transition-colors
+            ${isDragging ? "bg-[var(--color-pe-green)]/50" : ""}
+          `}
+        />
       </aside>
     </>
   );
