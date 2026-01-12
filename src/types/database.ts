@@ -14,6 +14,7 @@ export interface Message {
   thread_id: string;
   role: "user" | "assistant";
   content: string;
+  tool_logs?: string[] | null;
   created_at: string;
 }
 
