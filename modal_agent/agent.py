@@ -163,15 +163,28 @@ SLEEP_TOOL = {
 CREATE_ARTIFACT_TOOL = {
     "name": "create_artifact",
     "description": """Create an interactive artifact to visualize data or results.
-Supports static HTML or full JS/TS apps with npm dependencies (built with bun).
 
 Types:
-- "html": Static HTML/CSS/JS (use CDN links for libraries). Content is a complete HTML document.
-- "react": React app. Content is the main App.tsx/App.jsx code. Dependencies auto-include react/react-dom.
-- "script": Node.js script that outputs HTML. Content is JS/TS code. Output goes to stdout.
+- "html": Static HTML/CSS/JS with CDN libraries (preferred for charts/visualizations)
+- "react": React app built with bun. Content is App.tsx code.
+- "script": Node.js script that outputs HTML to stdout.
 
-For "html" type, use CDN links like Chart.js: <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-For "react"/"script", specify npm packages in dependencies array.""",
+Style requirements:
+- Fill container responsively: use width:100%, height:100vh, no margins/padding on body
+- No scrollbars: content must fit within the viewport
+- Use CSS: html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden}
+
+Charts - use D3.js:
+- Load via: <script src="https://d3js.org/d3.v7.min.js"></script>
+- Make charts responsive: use viewBox, preserve aspect ratio
+- Use ResizeObserver to redraw on container resize
+- PolicyEngine brand colour: #2C6496 (teal)
+
+Example responsive D3 pattern:
+const svg = d3.select("#chart").append("svg")
+  .attr("viewBox", "0 0 800 400")
+  .attr("preserveAspectRatio", "xMidYMid meet")
+  .style("width", "100%").style("height", "100%");""",
     "input_schema": {
         "type": "object",
         "properties": {
