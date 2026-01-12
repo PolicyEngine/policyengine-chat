@@ -559,7 +559,21 @@ def run_agent(
                     final_response = block.text
                 elif block.type == "tool_use":
                     log(f"[TOOL_USE] {block.name}: {json.dumps(block.input)[:200]}")
-                    assistant_content.append(block)
+                    # For artifacts, don't store full HTML in history (saves tokens)
+                    if block.name == "create_artifact":
+                        truncated_block = type(block)(
+                            type="tool_use",
+                            id=block.id,
+                            name=block.name,
+                            input={
+                                "title": block.input.get("title", ""),
+                                "type": block.input.get("type", "html"),
+                                "content": "[HTML content stored separately]",
+                            }
+                        )
+                        assistant_content.append(truncated_block)
+                    else:
+                        assistant_content.append(block)
 
                     if block.name == "sleep":
                         seconds = min(max(block.input.get("seconds", 5), 1), 60)
