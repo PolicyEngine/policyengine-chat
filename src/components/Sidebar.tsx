@@ -108,7 +108,13 @@ export function Sidebar() {
 
   async function deleteThread(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    await supabase.from("threads").delete().eq("id", id);
+    const { error } = await supabase.from("threads").delete().eq("id", id);
+    if (error) {
+      console.error("Failed to delete thread:", error);
+      return;
+    }
+    // Remove from local state immediately for responsive UI
+    setThreads((prev) => prev.filter((t) => t.id !== id));
     if (currentThreadId === id) {
       router.push("/");
     }
@@ -124,7 +130,7 @@ export function Sidebar() {
       {/* Mobile toggle */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-white border border-[var(--color-border)] md:hidden shadow-sm"
+        className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-white border border-[var(--color-border)] md:hidden shadow-sm cursor-pointer"
       >
         {isOpen ? (
           <svg className="w-5 h-5 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -164,7 +170,7 @@ export function Sidebar() {
               disabled={isLoading || !user}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5
                 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-lg
-                transition-colors font-medium text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                transition-colors font-medium text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? (
                 <>
@@ -236,7 +242,7 @@ export function Sidebar() {
                       <button
                         onClick={(e) => deleteThread(thread.id, e)}
                         className={`
-                          opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all
+                          opacity-0 group-hover:opacity-100 p-1.5 rounded-md transition-all cursor-pointer
                           ${
                             currentThreadId === thread.id
                               ? "hover:bg-white/20 text-white/70"

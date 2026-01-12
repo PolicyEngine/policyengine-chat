@@ -37,10 +37,6 @@ SYSTEM_PROMPT = """You are a PolicyEngine assistant that helps users understand 
 
 You have access to the full PolicyEngine API.
 
-## CRITICAL: Use get_tool_help before calling API tools
-
-Tool descriptions are minimal to save tokens. Before using any API tool for the first time, call `get_tool_help` with the tool name to get full documentation including required parameters. You can batch multiple get_tool_help calls in one turn.
-
 ## CRITICAL: Always filter by country
 
 When searching for parameters or datasets, ALWAYS include tax_benefit_model_name:
@@ -163,21 +159,6 @@ SLEEP_TOOL = {
             }
         },
         "required": ["seconds"],
-    },
-}
-
-GET_TOOL_HELP_TOOL = {
-    "name": "get_tool_help",
-    "description": "Get detailed documentation for a tool before using it. Call this the first time you use any API tool.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "tool_name": {
-                "type": "string",
-                "description": "Name of the tool to get help for",
-            }
-        },
-        "required": ["tool_name"],
     },
 }
 
@@ -364,57 +345,6 @@ def openapi_to_claude_tools(spec: dict) -> list[dict]:
     return tools
 
 
-def create_minimal_tool_stubs(full_tools: list[dict]) -> list[dict]:
-    """Create minimal tool stubs with just name and short description.
-
-    Full documentation is available via get_tool_help tool.
-    """
-    stubs = []
-    for tool in full_tools:
-        # Extract just the first line (METHOD /path) as the short description
-        desc = tool["description"]
-        short_desc = desc.split("\n")[0] if "\n" in desc else desc
-
-        stubs.append({
-            "name": tool["name"],
-            "description": short_desc,
-            # Minimal schema - just indicate it takes parameters
-            "input_schema": {"type": "object", "properties": {}},
-        })
-    return stubs
-
-
-def get_tool_help_response(tool_name: str, full_tools: list[dict]) -> str:
-    """Return full documentation for a tool."""
-    for tool in full_tools:
-        if tool["name"] == tool_name:
-            # Format full documentation
-            doc = f"## {tool['name']}\n\n"
-            doc += f"{tool['description']}\n\n"
-            doc += "### Parameters\n\n"
-            schema = tool.get("input_schema", {})
-            props = schema.get("properties", {})
-            required = schema.get("required", [])
-
-            if props:
-                for prop_name, prop_schema in props.items():
-                    req_marker = " (required)" if prop_name in required else ""
-                    prop_type = prop_schema.get("type", "any")
-                    prop_desc = prop_schema.get("description", "")
-                    doc += f"- **{prop_name}**{req_marker}: {prop_type}"
-                    if prop_desc:
-                        doc += f" - {prop_desc}"
-                    doc += "\n"
-            else:
-                doc += "No parameters.\n"
-
-            return doc
-
-    # Tool not found - list available tools
-    tool_names = [t["name"] for t in full_tools]
-    return f"Tool '{tool_name}' not found. Available tools:\n" + "\n".join(f"- {n}" for n in tool_names[:30])
-
-
 def execute_api_tool(
     tool: dict,
     tool_input: dict,
@@ -510,6 +440,7 @@ def run_agent(
     history: list[dict] | None = None,
     max_turns: int = 30,
     user_id: str | None = None,
+    model: str = "claude-sonnet-4-5",
 ) -> dict:
     """Run agentic loop to answer a policy question.
 
@@ -546,9 +477,8 @@ def run_agent(
     # Create lookup for API execution (needs full tool with _meta)
     tool_lookup = {t["name"]: t for t in full_tools}
 
-    # Create minimal stubs for Claude (reduces token cost)
-    minimal_stubs = create_minimal_tool_stubs(full_tools)
-    claude_tools = minimal_stubs + [SLEEP_TOOL, GET_TOOL_HELP_TOOL, CREATE_ARTIFACT_TOOL]
+    # Use full tools (prompt caching makes this efficient)
+    claude_tools = full_tools + [SLEEP_TOOL, CREATE_ARTIFACT_TOOL]
 
     client = anthropic.Anthropic()
     logfire.instrument_anthropic(client)
@@ -576,7 +506,7 @@ def run_agent(
             log(f"[AGENT] Turn {turns}")
 
             response = client.messages.create(
-                model="claude-sonnet-4-5",
+                model=model,
                 max_tokens=4096,
                 system=cached_system,
                 tools=cached_tools,
@@ -608,10 +538,6 @@ def run_agent(
                         log(f"[SLEEP] Waiting {seconds} seconds...")
                         time.sleep(seconds)
                         result = f"Slept for {seconds} seconds"
-                    elif block.name == "get_tool_help":
-                        tool_name = block.input.get("tool_name", "")
-                        log(f"[TOOL_HELP] Fetching docs for: {tool_name}")
-                        result = get_tool_help_response(tool_name, full_tools)
                     elif block.name == "create_artifact":
                         title = block.input.get("title", "Untitled")
                         artifact_type = block.input.get("type", "html")
@@ -721,6 +647,7 @@ class AgentRequest(BaseModel):
     api_base_url: str = "https://v2.api.policyengine.org"
     history: list[dict] | None = None
     user_id: str | None = None
+    model: str = "claude-sonnet-4-5"
 
 
 @app.function(image=image, secrets=[anthropic_secret, supabase_secret, logfire_secret], timeout=600)
@@ -733,6 +660,7 @@ def run_agent_web(request: AgentRequest) -> dict:
         api_base_url=request.api_base_url,
         history=request.history,
         user_id=request.user_id,
+        model=request.model,
     )
 
 

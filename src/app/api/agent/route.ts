@@ -10,6 +10,7 @@ interface AgentRequest {
   question: string;
   history: { role: string; content: string }[];
   threadId: string;
+  model?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
               thread_id: body.threadId,
               api_base_url: API_BASE_URL,
               history: body.history,
+              model: body.model || "claude-sonnet-4-5",
             }),
           }
         );
