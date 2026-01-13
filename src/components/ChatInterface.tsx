@@ -951,25 +951,42 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
             disabled={isLoading}
             className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-[14px] border border-[var(--color-border)] rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-pe-green)] focus:border-transparent disabled:opacity-50 placeholder:text-[var(--color-text-muted)]"
           />
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="px-3 sm:px-5 py-2.5 sm:py-3 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-xl text-[14px] font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
-          >
-            {isLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Working</span>
-              </>
-            ) : (
-              <>
-                <span>Ask</span>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
-              </>
-            )}
-          </button>
+          {isLoading ? (
+            <button
+              type="button"
+              onClick={async () => {
+                // Insert cancellation signal for the agent to pick up
+                await supabase.from("agent_logs").insert({
+                  thread_id: threadId,
+                  message: "[CANCELLED]",
+                });
+                setIsLoading(false);
+                setLogs((prev) => [...prev, {
+                  id: `cancel-${Date.now()}`,
+                  thread_id: threadId,
+                  message: "[AGENT] Cancelled by user",
+                  created_at: new Date().toISOString(),
+                }]);
+              }}
+              className="px-3 sm:px-5 py-2.5 sm:py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[14px] font-medium cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span className="hidden sm:inline">Stop</span>
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="px-3 sm:px-5 py-2.5 sm:py-3 bg-[var(--color-pe-green)] hover:bg-[var(--color-pe-green-dark)] text-white rounded-xl text-[14px] font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
+            >
+              <span>Ask</span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </button>
+          )}
         </form>
         <p className="text-center text-[11px] text-[var(--color-text-muted)] mt-2 max-w-3xl mx-auto">
           Messages are processed by PolicyEngine and stored on our servers. Do not share sensitive personal information.

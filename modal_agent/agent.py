@@ -45,9 +45,27 @@ Parameters and datasets from both countries are in the same database. Without th
 
 ## Key workflows
 
-1. **Household calculations**:
-   - POST /household/calculate with model_name and people array
+1. **Household calculations** (supports batch processing):
+   - POST /household/calculate with model_name and entities
    - Poll GET /household/calculate/{job_id} until completed
+   - **BATCH PROCESSING**: You can calculate MANY households in one API call by:
+     - Each person needs a `person_household_id` field linking to their household
+     - Each household needs an `id` field (e.g., "household_1", "household_2")
+     - Example structure for 2 households with different incomes:
+       ```json
+       {
+         "people": [
+           {"id": "person_1", "age": 30, "person_household_id": "household_1"},
+           {"id": "person_2", "age": 30, "person_household_id": "household_2"}
+         ],
+         "households": [
+           {"id": "household_1"},
+           {"id": "household_2"}
+         ]
+       }
+       ```
+     - Same pattern for other entities: `person_tax_unit_id`, `person_family_id`, etc.
+     - This is MUCH faster than separate API calls - use for income sweeps, charts, etc.
 
 2. **Parameter lookup**:
    - GET /parameters/?search=...&tax_benefit_model_name=policyengine-uk (ALWAYS include country filter)
@@ -185,9 +203,13 @@ SLEEP_TOOL = {
 
 CREATE_ARTIFACT_TOOL = {
     "name": "create_artifact",
-    "description": """Create a single, polished interactive artifact. Only call once per visualization.
+    "description": """Create a single, polished interactive artifact.
 
-IMPORTANT: Create ONE artifact per request. Never create empty or placeholder artifacts.
+CRITICAL RULES:
+- Call ONCE per visualization - NEVER create the same chart twice
+- Do NOT recreate artifacts you've already made in this conversation
+- If you've already created a chart, move on to your text response
+- Never create empty or placeholder artifacts
 
 Types:
 - "html": Static HTML/CSS/JS with CDN libraries (preferred for charts/visualizations)
@@ -621,8 +643,22 @@ def run_agent(
                 else:
                     raise
 
+    def is_cancelled() -> bool:
+        """Check if the thread has been cancelled by the user."""
+        try:
+            result = supabase.table("agent_logs").select("message").eq("thread_id", thread_id).eq("message", "[CANCELLED]").execute()
+            return len(result.data) > 0
+        except Exception:
+            return False
+
     with logfire.span("agent_conversation", thread_id=thread_id, user_id=user_id or "anonymous"):
         while turns < max_turns:
+            # Check for cancellation before each turn
+            if is_cancelled():
+                log("[AGENT] Cancelled by user")
+                final_response = "Cancelled by user."
+                break
+
             turns += 1
             log(f"[AGENT] Turn {turns}")
 
