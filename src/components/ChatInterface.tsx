@@ -449,12 +449,15 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
             const tempIndex = prev.findIndex(
               (m) => m.id.startsWith("temp-") && m.role === newMessage.role && m.content === newMessage.content
             );
+            let updated: Message[];
             if (tempIndex !== -1) {
-              const updated = [...prev];
+              updated = [...prev];
               updated[tempIndex] = newMessage;
-              return updated;
+            } else {
+              updated = [...prev, newMessage];
             }
-            return [...prev, newMessage];
+            // Sort by created_at to ensure correct order
+            return updated.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
           });
           if (newMessage.role === "assistant") {
             // Save logs for this message before clearing (use callback to get current logs)
@@ -630,7 +633,17 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
   async function deleteArtifact(artifactId: string) {
     // Optimistic update
     setArtifacts((prev) => prev.filter((a) => a.id !== artifactId));
-    await supabase.from("artifacts").delete().eq("id", artifactId);
+    const { error } = await supabase.from("artifacts").delete().eq("id", artifactId);
+    if (error) {
+      console.error("Failed to delete artifact:", error);
+      // Reload artifacts if delete failed
+      const { data } = await supabase
+        .from("artifacts")
+        .select("*")
+        .eq("thread_id", threadId)
+        .order("created_at", { ascending: true });
+      if (data) setArtifacts(data);
+    }
   }
 
   async function loadLogs() {
