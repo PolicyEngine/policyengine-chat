@@ -263,7 +263,7 @@ function ToolCard({ step }: { step: ParsedStep }) {
   return null;
 }
 
-function ArtifactCard({ artifact }: { artifact: Artifact }) {
+function ArtifactCard({ artifact, onDelete }: { artifact: Artifact; onDelete?: () => void }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const artifactUrl = `https://nikhilwoodruff--policyengine-chat-agent-serve-artifact.modal.run?id=${artifact.id}`;
@@ -296,6 +296,20 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </a>
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="p-1.5 hover:bg-red-100 rounded-md transition-colors cursor-pointer"
+              title="Delete artifact"
+            >
+              <svg className="w-4 h-4 text-[var(--color-text-muted)] hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
           <svg
             className={`w-4 h-4 text-[var(--color-text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
             fill="none"
@@ -613,6 +627,12 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
     if (data) setArtifacts(data);
   }
 
+  async function deleteArtifact(artifactId: string) {
+    // Optimistic update
+    setArtifacts((prev) => prev.filter((a) => a.id !== artifactId));
+    await supabase.from("artifacts").delete().eq("id", artifactId);
+  }
+
   async function loadLogs() {
     // Load existing logs (in case of page refresh while agent is running)
     const { data: existingLogs } = await supabase
@@ -887,7 +907,7 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
 
           {/* Artifacts */}
           {artifacts.map((artifact) => (
-            <ArtifactCard key={artifact.id} artifact={artifact} />
+            <ArtifactCard key={artifact.id} artifact={artifact} onDelete={() => deleteArtifact(artifact.id)} />
           ))}
 
           {/* Live agent logs */}
