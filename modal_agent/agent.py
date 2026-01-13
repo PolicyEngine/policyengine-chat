@@ -620,7 +620,7 @@ def run_agent(
     total_output_tokens = 0
     total_cache_read_tokens = 0
     total_cache_creation_tokens = 0
-    created_artifacts: set[str] = set()  # Track artifact titles to prevent duplicates
+    artifact_created = False  # Only allow ONE artifact per agent run
 
     # Add cache_control to tools (only last item needs it to cache the whole prefix)
     cached_tools = claude_tools[:-1] + [{**claude_tools[-1], "cache_control": {"type": "ephemeral"}}]
@@ -706,16 +706,15 @@ def run_agent(
                         time.sleep(seconds)
                         result = f"Slept for {seconds} seconds"
                     elif block.name == "create_artifact":
-                        title = block.input.get("title", "Untitled")
-                        artifact_type = block.input.get("type", "html")
-                        content = block.input.get("content", "")
-                        dependencies = block.input.get("dependencies", [])
-
-                        # Skip duplicate artifacts
-                        if title in created_artifacts:
-                            log(f"[ARTIFACT] Skipping duplicate: {title}")
-                            result = f"Artifact '{title}' already created - skipping duplicate"
+                        # Only allow ONE artifact per agent run
+                        if artifact_created:
+                            log(f"[ARTIFACT] Rejected - already created one this run")
+                            result = "ERROR: You already created an artifact. Do NOT create another. Provide your final text response now."
                         else:
+                            title = block.input.get("title", "Untitled")
+                            artifact_type = block.input.get("type", "html")
+                            content = block.input.get("content", "")
+                            dependencies = block.input.get("dependencies", [])
                             log(f"[ARTIFACT] Creating: {title} (type: {artifact_type})")
                             try:
                                 artifact_data = supabase.table("artifacts").insert({
@@ -726,9 +725,9 @@ def run_agent(
                                     "dependencies": dependencies,
                                 }).execute()
                                 artifact_id = artifact_data.data[0]["id"]
-                                created_artifacts.add(title)
+                                artifact_created = True
                                 artifact_url = f"https://nikhilwoodruff--policyengine-chat-agent-serve-artifact.modal.run?id={artifact_id}"
-                                result = f"Artifact created: {title}\nID: {artifact_id}\nURL: {artifact_url}"
+                                result = f"Artifact successfully created and displayed to user. Title: {title}. Do NOT create another artifact - provide your final text response summarizing the results."
                                 log(f"[ARTIFACT] Created with ID: {artifact_id}")
                             except Exception as e:
                                 result = f"Failed to create artifact: {str(e)}"
