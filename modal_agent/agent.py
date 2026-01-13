@@ -643,8 +643,22 @@ def run_agent(
                 else:
                     raise
 
+    def is_cancelled() -> bool:
+        """Check if the thread has been cancelled by the user."""
+        try:
+            result = supabase.table("agent_logs").select("message").eq("thread_id", thread_id).eq("message", "[CANCELLED]").execute()
+            return len(result.data) > 0
+        except Exception:
+            return False
+
     with logfire.span("agent_conversation", thread_id=thread_id, user_id=user_id or "anonymous"):
         while turns < max_turns:
+            # Check for cancellation before each turn
+            if is_cancelled():
+                log("[AGENT] Cancelled by user")
+                final_response = "Cancelled by user."
+                break
+
             turns += 1
             log(f"[AGENT] Turn {turns}")
 

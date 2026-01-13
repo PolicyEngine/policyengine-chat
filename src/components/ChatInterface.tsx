@@ -954,7 +954,20 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
           {isLoading ? (
             <button
               type="button"
-              onClick={() => setIsLoading(false)}
+              onClick={async () => {
+                // Insert cancellation signal for the agent to pick up
+                await supabase.from("agent_logs").insert({
+                  thread_id: threadId,
+                  message: "[CANCELLED]",
+                });
+                setIsLoading(false);
+                setLogs((prev) => [...prev, {
+                  id: `cancel-${Date.now()}`,
+                  thread_id: threadId,
+                  message: "[AGENT] Cancelled by user",
+                  created_at: new Date().toISOString(),
+                }]);
+              }}
               className="px-3 sm:px-5 py-2.5 sm:py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[14px] font-medium cursor-pointer transition-colors flex items-center gap-2 shadow-sm"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
