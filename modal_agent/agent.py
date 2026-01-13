@@ -619,6 +619,7 @@ def run_agent(
     total_output_tokens = 0
     total_cache_read_tokens = 0
     total_cache_creation_tokens = 0
+    created_artifacts: set[str] = set()  # Track artifact titles to prevent duplicates
 
     # Add cache_control to tools (only last item needs it to cache the whole prefix)
     cached_tools = claude_tools[:-1] + [{**claude_tools[-1], "cache_control": {"type": "ephemeral"}}]
@@ -708,22 +709,29 @@ def run_agent(
                         artifact_type = block.input.get("type", "html")
                         content = block.input.get("content", "")
                         dependencies = block.input.get("dependencies", [])
-                        log(f"[ARTIFACT] Creating: {title} (type: {artifact_type})")
-                        try:
-                            artifact_data = supabase.table("artifacts").insert({
-                                "thread_id": thread_id,
-                                "type": artifact_type,
-                                "title": title,
-                                "content": content,
-                                "dependencies": dependencies,
-                            }).execute()
-                            artifact_id = artifact_data.data[0]["id"]
-                            artifact_url = f"https://nikhilwoodruff--policyengine-chat-agent-serve-artifact.modal.run?id={artifact_id}"
-                            result = f"Artifact created: {title}\nID: {artifact_id}\nURL: {artifact_url}"
-                            log(f"[ARTIFACT] Created with ID: {artifact_id}")
-                        except Exception as e:
-                            result = f"Failed to create artifact: {str(e)}"
-                            log(f"[ARTIFACT] Error: {str(e)}")
+
+                        # Skip duplicate artifacts
+                        if title in created_artifacts:
+                            log(f"[ARTIFACT] Skipping duplicate: {title}")
+                            result = f"Artifact '{title}' already created - skipping duplicate"
+                        else:
+                            log(f"[ARTIFACT] Creating: {title} (type: {artifact_type})")
+                            try:
+                                artifact_data = supabase.table("artifacts").insert({
+                                    "thread_id": thread_id,
+                                    "type": artifact_type,
+                                    "title": title,
+                                    "content": content,
+                                    "dependencies": dependencies,
+                                }).execute()
+                                artifact_id = artifact_data.data[0]["id"]
+                                created_artifacts.add(title)
+                                artifact_url = f"https://nikhilwoodruff--policyengine-chat-agent-serve-artifact.modal.run?id={artifact_id}"
+                                result = f"Artifact created: {title}\nID: {artifact_id}\nURL: {artifact_url}"
+                                log(f"[ARTIFACT] Created with ID: {artifact_id}")
+                            except Exception as e:
+                                result = f"Failed to create artifact: {str(e)}"
+                                log(f"[ARTIFACT] Error: {str(e)}")
                     else:
                         tool = tool_lookup.get(block.name)
                         if tool:
