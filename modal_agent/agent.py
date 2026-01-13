@@ -602,18 +602,31 @@ def run_agent(
     cached_tools = claude_tools[:-1] + [{**claude_tools[-1], "cache_control": {"type": "ephemeral"}}]
     cached_system = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
 
+    def call_claude_with_retry(max_retries: int = 3) -> anthropic.types.Message:
+        """Call Claude API with retry logic for transient errors."""
+        for attempt in range(max_retries):
+            try:
+                return client.messages.create(
+                    model=model,
+                    max_tokens=4096,
+                    system=cached_system,
+                    tools=cached_tools,
+                    messages=messages,
+                )
+            except anthropic.APIStatusError as e:
+                if e.status_code in (529, 503, 500) and attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 5  # 5s, 10s, 20s
+                    log(f"[AGENT] API error {e.status_code}, retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    raise
+
     with logfire.span("agent_conversation", thread_id=thread_id, user_id=user_id or "anonymous"):
         while turns < max_turns:
             turns += 1
             log(f"[AGENT] Turn {turns}")
 
-            response = client.messages.create(
-                model=model,
-                max_tokens=4096,
-                system=cached_system,
-                tools=cached_tools,
-                messages=messages,
-            )
+            response = call_claude_with_retry()
 
             # Track token usage
             total_input_tokens += response.usage.input_tokens
