@@ -655,17 +655,24 @@ export function ChatInterface({ threadId }: ChatInterfaceProps) {
       .order("created_at", { ascending: true });
 
     if (existingLogs && existingLogs.length > 0) {
-      // Check if agent is still running (logs exist but no completion marker)
-      const hasCompleted = existingLogs.some((log) =>
-        log.message.includes("[AGENT] Completed")
+      // Check if agent is finished (completed, cancelled, or stale)
+      const hasFinished = existingLogs.some((log) =>
+        log.message.includes("[AGENT] Completed") ||
+        log.message.includes("[AGENT] Cancelled") ||
+        log.message === "[CANCELLED]"
       );
 
-      if (!hasCompleted) {
+      // Also check if logs are stale (last log > 5 minutes old = agent probably crashed)
+      const lastLog = existingLogs[existingLogs.length - 1];
+      const lastLogAge = Date.now() - new Date(lastLog.created_at).getTime();
+      const isStale = lastLogAge > 5 * 60 * 1000; // 5 minutes
+
+      if (!hasFinished && !isStale) {
         // Agent is still running - show logs and set loading state
         setLogs(existingLogs);
         setIsLoading(true);
       }
-      // If completed, logs will be attached to the message via tool_logs
+      // If finished or stale, logs will be attached to the message via tool_logs
     }
   }
 
