@@ -46,26 +46,27 @@ Parameters and datasets from both countries are in the same database. Without th
 ## Key workflows
 
 1. **Household calculations** (supports batch processing):
-   - POST /household/calculate with model_name and entities
+   - POST /household/calculate with tax_benefit_model_name, people, entities, and year
    - Poll GET /household/calculate/{job_id} until completed
-   - **BATCH PROCESSING**: You can calculate MANY households in one API call by:
-     - Each person needs a `person_household_id` field linking to their household
-     - Each household needs an `id` field (e.g., "household_1", "household_2")
-     - Example structure for 2 households with different incomes:
+   - **BATCH PROCESSING**: You can calculate MANY households in one API call:
+     - Use numeric IDs to link people to entities
+     - Each person needs `person_id` and `person_{entity}_id` fields (e.g., `person_household_id`, `person_tax_unit_id`)
+     - Each entity needs `{entity}_id` field (e.g., `household_id`, `tax_unit_id`)
+     - For single household, you can omit IDs entirely
+     - Example US request with 2 households at different income levels:
        ```json
        {
+         "tax_benefit_model_name": "policyengine_us",
          "people": [
-           {"id": "person_1", "age": 30, "person_household_id": "household_1"},
-           {"id": "person_2", "age": 30, "person_household_id": "household_2"}
+           {"person_id": 0, "person_household_id": 0, "person_tax_unit_id": 0, "age": 40, "employment_income": 50000},
+           {"person_id": 1, "person_household_id": 1, "person_tax_unit_id": 1, "age": 40, "employment_income": 100000}
          ],
-         "households": [
-           {"id": "household_1"},
-           {"id": "household_2"}
-         ]
+         "tax_unit": [{"tax_unit_id": 0}, {"tax_unit_id": 1}],
+         "household": [{"household_id": 0}, {"household_id": 1}],
+         "year": 2024
        }
        ```
-     - Same pattern for other entities: `person_tax_unit_id`, `person_family_id`, etc.
-     - This is MUCH faster than separate API calls - use for income sweeps, charts, etc.
+     - Response includes results for ALL households - use this for income sweeps, charts, etc.
 
 2. **Parameter lookup**:
    - GET /parameters/?search=...&tax_benefit_model_name=policyengine-uk (ALWAYS include country filter)
