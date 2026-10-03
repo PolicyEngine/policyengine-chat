@@ -1,0 +1,7 @@
+# Exercise the minimum Anthropic SDK supported by the Modal image.
+anthropic==1.9.0
+fastapi
+logfire
+modal
+pytest
+requests

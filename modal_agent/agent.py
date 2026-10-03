@@ -12,8 +12,9 @@ from typing import Callable
 import modal
 import requests
 
+# anthropic>=1.9 for output_config (effort) and thinking.display
 image = modal.Image.debian_slim(python_version="3.12").pip_install(
-    "anthropic", "requests", "supabase", "fastapi", "logfire"
+    "anthropic>=1.9.0,<2", "requests", "supabase", "fastapi", "logfire"
 )
 
 # Image with bun for artifact building
@@ -29,6 +30,8 @@ app = modal.App("policyengine-chat-agent")
 anthropic_secret = modal.Secret.from_name("anthropic-api-key")
 supabase_secret = modal.Secret.from_name("policyengine-chat-supabase")
 logfire_secret = modal.Secret.from_name("logfire")
+
+REFUSAL_MESSAGE = "Sorry, I can't help with that request."
 
 
 SYSTEM_PROMPT = """You are a PolicyEngine assistant that helps users understand tax and benefit policies.
@@ -523,11 +526,27 @@ def execute_api_tool(
         return f"Request error: {str(e)}"
 
 
+class RefusalError(Exception):
+    """Claude declined the request (stop_reason == "refusal")."""
+
+
+def response_text(response) -> str:
+    """Join a response's text blocks, skipping thinking and tool_use blocks.
+
+    Raises RefusalError if Claude declined, since the content is then incomplete.
+    """
+    if response.stop_reason == "refusal":
+        category = getattr(getattr(response, "stop_details", None), "category", None)
+        raise RefusalError(f"Claude declined the request (category: {category})")
+    return "".join(block.text for block in response.content if block.type == "text")
+
+
 def summarize_api_result(client, raw_result: str, tool_name: str, tool_input: dict) -> str:
     """Use Haiku to extract relevant information from large API responses."""
     try:
+        # Haiku 4.5 runs without thinking unless asked, and rejects output_config.effort
         response = client.messages.create(
-            model="claude-haiku-3-5-20241022",
+            model="claude-haiku-4-5",
             max_tokens=1000,
             messages=[{
                 "role": "user",
@@ -542,9 +561,13 @@ Response:
 Return only the essential information in a compact format."""
             }]
         )
-        return response.content[0].text
+        summary = response_text(response)
+        if not summary:
+            raise ValueError("empty summary")
+        return summary
     except Exception as e:
         # Fall back to truncation if Haiku fails
+        print(f"Failed to summarize API result: {e}")
         return raw_result[:2000] + f"\n...[truncated, {len(raw_result)} total chars]"
 
 
@@ -556,7 +579,7 @@ def run_agent(
     history: list[dict] | None = None,
     max_turns: int = 30,
     user_id: str | None = None,
-    model: str = "claude-opus-4-5",
+    model: str = "claude-opus-5-5",
 ) -> dict:
     """Run agentic loop to answer a policy question.
 
@@ -626,13 +649,25 @@ def run_agent(
     cached_tools = claude_tools[:-1] + [{**claude_tools[-1], "cache_control": {"type": "ephemeral"}}]
     cached_system = [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}]
 
+    # Keep the existing request shape for callers that explicitly choose another model.
+    # Claude 5.5 needs headroom for thinking and summarized display for visible progress.
+    model_options = {"max_tokens": 4096}
+    if model in {"claude-opus-5-5", "claude-sonnet-5-5"}:
+        model_options = {
+            "max_tokens": 16000,
+            # Opus thinks automatically, but explicit adaptive mode lets us request
+            # summarized display so progress between tool calls stays visible.
+            "thinking": {"type": "adaptive", "display": "summarized"},
+            "output_config": {"effort": "medium"},
+        }
+
     def call_claude_with_retry(max_retries: int = 3) -> anthropic.types.Message:
         """Call Claude API with retry logic for transient errors."""
         for attempt in range(max_retries):
             try:
                 return client.messages.create(
                     model=model,
-                    max_tokens=4096,
+                    **model_options,
                     system=cached_system,
                     tools=cached_tools,
                     messages=messages,
@@ -674,31 +709,24 @@ def run_agent(
 
             log(f"[AGENT] Stop reason: {response.stop_reason}")
 
-            assistant_content = []
+            if response.stop_reason == "refusal":
+                category = getattr(getattr(response, "stop_details", None), "category", None)
+                log(f"[AGENT] Claude declined the request (category: {category})")
+                final_response = REFUSAL_MESSAGE
+                break
+
             tool_results = []
 
             for block in response.content:
-                if block.type == "text":
+                if block.type == "thinking":
+                    # Progress notes between tool calls arrive as thinking blocks; empty ones
+                    # (display omitted) have nothing to show
+                    if block.thinking:
+                        log(f"[ASSISTANT] {block.thinking[:500]}")
+                elif block.type == "text":
                     log(f"[ASSISTANT] {block.text[:500]}")
-                    assistant_content.append(block)
-                    final_response = block.text
                 elif block.type == "tool_use":
                     log(f"[TOOL_USE] {block.name}: {json.dumps(block.input)[:200]}")
-                    # For artifacts, don't store full HTML in history (saves tokens)
-                    if block.name == "create_artifact":
-                        truncated_block = type(block)(
-                            type="tool_use",
-                            id=block.id,
-                            name=block.name,
-                            input={
-                                "title": block.input.get("title", ""),
-                                "type": block.input.get("type", "html"),
-                                "content": "[HTML content stored separately]",
-                            }
-                        )
-                        assistant_content.append(truncated_block)
-                    else:
-                        assistant_content.append(block)
 
                     if block.name == "sleep":
                         seconds = min(max(block.input.get("seconds", 5), 1), 60)
@@ -754,7 +782,13 @@ def run_agent(
                         "content": result,
                     })
 
-            messages.append({"role": "assistant", "content": assistant_content})
+            turn_text = response_text(response)
+            if turn_text:
+                final_response = turn_text
+
+            # Append the turn verbatim, thinking blocks and full artifact HTML included: Opus 5.5
+            # and Sonnet 5.5 reject a replayed thinking block if the history before it changed
+            messages.append({"role": "assistant", "content": response.content})
 
             if tool_results:
                 messages.append({"role": "user", "content": tool_results})
@@ -796,16 +830,21 @@ def run_agent(
 
         # Generate a title for the thread
         try:
+            # Sonnet 5.5 thinks adaptively; low effort keeps it brief, and max_tokens leaves room
             title_response = client.messages.create(
-                model="claude-sonnet-4-5",
-                max_tokens=50,
+                model="claude-sonnet-5-5",
+                max_tokens=4096,
+                thinking={"type": "adaptive"},
+                output_config={"effort": "low"},
                 messages=[
                     {"role": "user", "content": question},
                     {"role": "assistant", "content": final_response},
                     {"role": "user", "content": "Generate a short title (max 6 words) for this conversation in sentence case (only capitalise first word and proper nouns). Reply with just the title, no quotes or punctuation."},
                 ],
             )
-            title = title_response.content[0].text.strip()[:60]
+            title = response_text(title_response).strip()[:60]
+            if not title:
+                raise ValueError("empty title")
             supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
             log(f"[AGENT] Set title: {title}")
         except Exception as e:
@@ -828,7 +867,7 @@ class AgentRequest(BaseModel):
     api_base_url: str = "https://v2.api.policyengine.org"
     history: list[dict] | None = None
     user_id: str | None = None
-    model: str = "claude-sonnet-4-5"
+    model: str = "claude-sonnet-5-5"
 
 
 @app.function(image=image, secrets=[anthropic_secret, supabase_secret, logfire_secret], timeout=600)

@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
               thread_id: body.threadId,
               api_base_url: API_BASE_URL,
               history: body.history,
-              model: "claude-opus-4-5",
+              model: "claude-opus-5-5",
             }),
           }
         );
