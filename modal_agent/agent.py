@@ -655,6 +655,8 @@ def run_agent(
     if model in {"claude-opus-5-5", "claude-sonnet-5-5"}:
         model_options = {
             "max_tokens": 16000,
+            # Opus thinks automatically, but explicit adaptive mode lets us request
+            # summarized display so progress between tool calls stays visible.
             "thinking": {"type": "adaptive", "display": "summarized"},
             "output_config": {"effort": "medium"},
         }
@@ -832,6 +834,7 @@ def run_agent(
             title_response = client.messages.create(
                 model="claude-sonnet-5-5",
                 max_tokens=4096,
+                thinking={"type": "adaptive"},
                 output_config={"effort": "low"},
                 messages=[
                     {"role": "user", "content": question},

@@ -24,6 +24,7 @@ def assert_chat_request(request, model):
     assert request["thinking"] == {"type": "adaptive", "display": "summarized"}
     assert not {"temperature", "top_p", "top_k"} & request.keys()
     assert request.get("tool_choice", {"type": "auto"}) == {"type": "auto"}
+    assert request["messages"][-1]["role"] == "user"
 
 
 @pytest.mark.parametrize(
@@ -53,8 +54,9 @@ def test_chat_models_and_title_use_valid_requests(run_agent, model, expected_mod
     title_request = api.title_requests[0]
     assert title_request["model"] == "claude-sonnet-5-5"
     assert title_request["output_config"] == {"effort": "low"}
+    assert title_request["thinking"] == {"type": "adaptive"}
     assert title_request["max_tokens"] == 4096
-    assert not {"temperature", "top_p", "top_k", "thinking", "tool_choice"} & title_request.keys()
+    assert not {"temperature", "top_p", "top_k", "tool_choice"} & title_request.keys()
     assert title_request["messages"][-1]["role"] == "user"
     assert {"title": "Personal allowance"} in db.updated("threads")
 

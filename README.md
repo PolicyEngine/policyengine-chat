@@ -47,9 +47,12 @@ The Modal function needs two secrets:
 Both Next.js routes and direct agent calls default to `claude-opus-5-5`. Modal
 endpoint requests that omit `model` default to `claude-sonnet-5-5`. Agent turns
 use medium effort with summarized thinking shown in the existing activity feed;
-titles use low effort. Large API responses use Haiku without adaptive thinking.
+titles use adaptive thinking at low effort. Large API responses use Haiku without
+adaptive thinking.
 
-For budgeting new runs, rates per million input/output tokens as of 2026-09-28:
+For budgeting new runs, rates per million input/output tokens verified against
+the [Anthropic models overview](https://platform.claude.com/docs/en/models/overview)
+on 2026-10-03:
 
 | Role | Model | Input | Output |
 |------|-------|-------|--------|
@@ -57,10 +60,15 @@ For budgeting new runs, rates per million input/output tokens as of 2026-09-28:
 | Titles and Modal endpoint default | `claude-sonnet-5-5` | $2 | $10 |
 | API-response summarizer | `claude-haiku-4-5` | $1 | $5 |
 
-Thinking counts toward the output token budget. Tool history retains complete
-responses, including thinking blocks and artifact inputs. Existing thread cost
-displays still use the legacy estimate over cumulative tokens; these totals do
-not identify the model and cannot be repriced accurately as historical usage.
+Haiku 4.5 remains the deliberate cheap tier. Its listed retirement is not sooner
+than October 15, 2026; recheck availability before deploying after that date.
+
+Thinking counts toward the output token budget. Within each agent run, tool
+history retains complete responses, including thinking blocks and artifact inputs.
+Persisted messages and subsequent chat history contain the final text only.
+Existing thread cost displays still use the legacy estimate over cumulative
+tokens; these totals do not identify the model and cannot be repriced accurately
+as historical usage.
 No environment variable overrides the model defaults; direct Modal callers can
 set the request's `model` field.
 
