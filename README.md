@@ -42,6 +42,42 @@ The Modal function needs two secrets:
 - `anthropic-api-key` - your Anthropic API key
 - `policyengine-chat-supabase` - Supabase URL and service key
 
+### Model defaults
+
+Both Next.js routes and direct agent calls default to `claude-opus-5-5`. Modal
+endpoint requests that omit `model` default to `claude-sonnet-5-5`. Agent turns
+use medium effort with summarized thinking shown in the existing activity feed;
+titles use low effort. Large API responses use Haiku without adaptive thinking.
+
+For budgeting new runs, rates per million input/output tokens as of 2026-09-28:
+
+| Role | Model | Input | Output |
+|------|-------|-------|--------|
+| Chat agent | `claude-opus-5-5` | $4 | $20 |
+| Titles and Modal endpoint default | `claude-sonnet-5-5` | $2 | $10 |
+| API-response summarizer | `claude-haiku-4-5` | $1 | $5 |
+
+Thinking counts toward the output token budget. Tool history retains complete
+responses, including thinking blocks and artifact inputs. Existing thread cost
+displays still use the legacy estimate over cumulative tokens; these totals do
+not identify the model and cannot be repriced accurately as historical usage.
+No environment variable overrides the model defaults; direct Modal callers can
+set the request's `model` field.
+
+### Checks
+
+```bash
+bun run lint
+bun run build
+python -m pip install -r modal_agent/tests/requirements.txt
+python -m pytest modal_agent/tests -q
+```
+
+The Python tests run the agent locally with a real Anthropic SDK and a mock HTTP
+transport, stub Supabase, PolicyEngine, and telemetry integrations, and block network access.
+They require no API keys or deployed services. The Modal image requires
+`anthropic>=1.9.0,<2` for `output_config` and summarized thinking support.
+
 ## Environment variables
 
 | Variable | Description |
